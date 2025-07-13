@@ -18,6 +18,7 @@ export default function CanvasWrap() {
         </p>
         <p className="text-sm text-amber-700">
           It will support A3 canvas with 3.5cm bleed per side, printed on A2 sheets.
+          This will be awesome for creating professional gallery wraps and stretched canvases.
         </p>
       </div>
     </div>
