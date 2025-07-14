@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FiCreditCard, FiImage, FiFileText, FiPrinter } from "react-icons/fi";
 import BusinessCards from "./components/BusinessCards";
+import CanvasWrap from "./components/CanvasWrap";
 
 const tools = [
     {
@@ -129,24 +130,8 @@ export default function Home() {
                 )}
                 
                 {selectedTool === "canvas-wrap" && (
-                    <div className="p-8">
-                        <div className="max-w-4xl mx-auto">
-                            <div className="text-center">
-                                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <FiImage className="w-8 h-8 text-amber-600" />
-                                </div>
-                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Canvas Wrap Tool</h2>
-                                <p className="text-gray-600 mb-6">
-                                    Create canvas wrap layouts with proper bleed for gallery wraps and stretched canvases.
-                                </p>
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 max-w-md mx-auto">
-                                    <p className="text-sm text-amber-800">
-                                        <strong>Coming Soon:</strong> This tool is currently in development. 
-                                        It will support A3 canvas with 3.5cm bleed per side, printed on A2 sheets.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                    <div className="h-full">
+                        <CanvasWrap />
                     </div>
                 )}
 
