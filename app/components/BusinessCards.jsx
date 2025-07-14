@@ -7,7 +7,7 @@ import { FiUpload, FiImage, FiX, FiCheck, FiLoader, FiSettings, FiEye } from "re
 const BUSINESS_CARD = {
   width: 90,  // 9cm in mm
   height: 50, // 5cm in mm
-  bleed: 3    // 3mm bleed
+  bleed: 0    // No bleed (updated)
 };
 
 const SHEET_SIZES = {
@@ -17,43 +17,38 @@ const SHEET_SIZES = {
 
 function calculateLayout(sheetSize, cardCount) {
   const sheet = SHEET_SIZES[sheetSize];
-  const cardWidth = BUSINESS_CARD.width + (BUSINESS_CARD.bleed * 2);
-  const cardHeight = BUSINESS_CARD.height + (BUSINESS_CARD.bleed * 2);
+  const cardWidth = BUSINESS_CARD.width; // 90mm (no bleed)
+  const cardHeight = BUSINESS_CARD.height; // 50mm (no bleed)
+  const cardSpacing = 1; // 1mm space between cards
   
   let cols, rows, margin;
   
   if (sheetSize === 'A4') {
+    // A4: 210×297mm - Optimal layout for 10 cards (2×5)
     cols = 2;
     rows = 5;
+    
+    // Calculate total width/height needed including spacing
+    const totalWidth = (cols * cardWidth) + ((cols - 1) * cardSpacing);
+    const totalHeight = (rows * cardHeight) + ((rows - 1) * cardSpacing);
+    
     margin = {
-      horizontal: (sheet.width - (cols * cardWidth)) / 2,
-      vertical: (sheet.height - (rows * cardHeight)) / 2
+      horizontal: (sheet.width - totalWidth) / 2,  // Center horizontally
+      vertical: (sheet.height - totalHeight) / 2   // Center vertically
     };
   } else if (sheetSize === 'A3') {
+    // A3: 297×420mm - Optimal layout for 24 cards (3×8)
     cols = 3;
-    rows = 7;
-    margin = {
-      horizontal: (sheet.width - (cols * cardWidth)) / 2,
-      vertical: (sheet.height - (rows * cardHeight)) / 2
-    };
+    rows = 8;
     
-    if (margin.vertical < 5) {
-      cols = 4;
-      rows = 6;
-      margin = {
-        horizontal: (sheet.width - (cols * cardWidth)) / 2,
-        vertical: (sheet.height - (rows * cardHeight)) / 2
-      };
-      
-      if (margin.horizontal < 5) {
-        cols = 3;
-        rows = 7;
-        margin = {
-          horizontal: (sheet.width - (cols * cardWidth)) / 2,
-          vertical: (sheet.height - (rows * cardHeight)) / 2
-        };
-      }
-    }
+    // Calculate total width/height needed including spacing
+    const totalWidth = (cols * cardWidth) + ((cols - 1) * cardSpacing);   // (3 * 90) + (2 * 1) = 272mm
+    const totalHeight = (rows * cardHeight) + ((rows - 1) * cardSpacing); // (8 * 50) + (7 * 1) = 407mm
+    
+    margin = {
+      horizontal: (sheet.width - totalWidth) / 2,  // (297 - 272) / 2 = 12.5mm
+      vertical: (sheet.height - totalHeight) / 2   // (420 - 407) / 2 = 6.5mm
+    };
   }
   
   const cardsPerSheet = cols * rows;
@@ -68,6 +63,7 @@ function calculateLayout(sheetSize, cardCount) {
     startY,
     cardWidth,
     cardHeight,
+    cardSpacing,
     totalSheets: Math.ceil(cardCount / cardsPerSheet),
     margin
   };
@@ -238,7 +234,7 @@ export default function BusinessCards() {
                   className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="A4">A4 (10 cards)</option>
-                  <option value="A3">A3 (21 cards)</option>
+                  <option value="A3">A3 (24 cards)</option>
                 </select>
               </div>
               <div>
@@ -405,12 +401,12 @@ export default function BusinessCards() {
                       <span className="font-medium">{layout.cols} × {layout.rows}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Card size (with bleed):</span>
-                      <span className="font-medium">96×56mm</span>
+                      <span className="text-gray-600">Card size:</span>
+                      <span className="font-medium">90×50mm</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Final card size:</span>
-                      <span className="font-medium">90×50mm</span>
+                      <span className="text-gray-600">Card spacing:</span>
+                      <span className="font-medium">1mm between cards</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Sheet margins:</span>
@@ -432,13 +428,14 @@ export default function BusinessCards() {
                       aspectRatio: sheetSize === 'A4' ? '210/297' : '297/420'
                     }}
                   >
-                    {/* Cards */}
+                    {/* Cards with spacing visualization */}
                     {Array.from({ length: Math.min(layout.cardsPerSheet, quantity) }).map((_, index) => {
                       const row = Math.floor(index / layout.cols);
                       const col = index % layout.cols;
                       
-                      const leftPercent = ((layout.startX + col * layout.cardWidth) / SHEET_SIZES[sheetSize].width) * 100;
-                      const topPercent = ((layout.startY + row * layout.cardHeight) / SHEET_SIZES[sheetSize].height) * 100;
+                      // Updated position calculation with spacing
+                      const leftPercent = ((layout.startX + col * (layout.cardWidth + layout.cardSpacing)) / SHEET_SIZES[sheetSize].width) * 100;
+                      const topPercent = ((layout.startY + row * (layout.cardHeight + layout.cardSpacing)) / SHEET_SIZES[sheetSize].height) * 100;
                       const widthPercent = (layout.cardWidth / SHEET_SIZES[sheetSize].width) * 100;
                       const heightPercent = (layout.cardHeight / SHEET_SIZES[sheetSize].height) * 100;
                       
@@ -457,7 +454,7 @@ export default function BusinessCards() {
                     })}
                   </div>
                   <p className="text-xs text-gray-500 text-center mt-2">
-                    Blue rectangles show card positions with 3mm bleed
+                    Blue rectangles show card positions with 1mm spacing
                   </p>
                 </div>
               </div>
@@ -503,9 +500,9 @@ export default function BusinessCards() {
         <h3 className="font-medium text-gray-900 mb-2">💡 Tips for Best Results</h3>
         <ul className="text-sm text-gray-600 space-y-1">
           <li>• Use high-resolution images (300dpi minimum) for sharp print quality</li>
-          <li>• Business cards will be 90×50mm with 3mm bleed on all sides</li>
+          <li>• Business cards are 90×50mm with 1mm spacing between cards for easy cutting</li>
           <li>• For double-sided printing, back images are automatically mirrored for proper alignment</li>
-          <li>• A4 sheets fit 10 cards, A3 sheets fit 21 cards optimally</li>
+          <li>• A4 sheets fit 10 cards, A3 sheets fit 24 cards optimally</li>
         </ul>
       </div>
     </div>

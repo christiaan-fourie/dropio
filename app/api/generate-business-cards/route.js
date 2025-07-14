@@ -4,7 +4,7 @@ import { PDFDocument, rgb } from 'pdf-lib';
 const BUSINESS_CARD = {
   width: 90,  // 9cm in mm
   height: 50, // 5cm in mm
-  bleed: 3    // 3mm bleed
+  bleed: 0    // No bleed
 };
 
 const SHEET_SIZES = {
@@ -17,8 +17,9 @@ const mmToPoints = (mm) => mm * 2.834645669;
 
 function calculateLayout(sheetSize, cardCount) {
   const sheet = SHEET_SIZES[sheetSize];
-  const cardWidth = BUSINESS_CARD.width + (BUSINESS_CARD.bleed * 2); // 96mm
-  const cardHeight = BUSINESS_CARD.height + (BUSINESS_CARD.bleed * 2); // 56mm
+  const cardWidth = BUSINESS_CARD.width; // 90mm (no bleed)
+  const cardHeight = BUSINESS_CARD.height; // 50mm (no bleed)
+  const cardSpacing = 1; // 1mm space between cards
   
   let cols, rows, margin;
   
@@ -26,35 +27,50 @@ function calculateLayout(sheetSize, cardCount) {
     // A4: 210×297mm - Optimal layout for 10 cards (2×5)
     cols = 2;
     rows = 5;
+    
+    // Calculate total width/height needed including spacing
+    const totalWidth = (cols * cardWidth) + ((cols - 1) * cardSpacing);
+    const totalHeight = (rows * cardHeight) + ((rows - 1) * cardSpacing);
+    
     margin = {
-      horizontal: (sheet.width - (cols * cardWidth)) / 2,  // (210 - 192) / 2 = 9mm
-      vertical: (sheet.height - (rows * cardHeight)) / 2   // (297 - 280) / 2 = 8.5mm
+      horizontal: (sheet.width - totalWidth) / 2,  // Center horizontally
+      vertical: (sheet.height - totalHeight) / 2   // Center vertically
     };
   } else if (sheetSize === 'A3') {
-    // A3: 297×420mm - Optimal layout for 21 cards (3×7)
+    // A3: 297×420mm - Try 3×8 layout for 24 cards first (better fit)
     cols = 3;
-    rows = 7;
+    rows = 8;
+    
+    // Calculate total width/height needed including spacing
+    const totalWidth = (cols * cardWidth) + ((cols - 1) * cardSpacing);   // (3 * 90) + (2 * 1) = 272mm
+    const totalHeight = (rows * cardHeight) + ((rows - 1) * cardSpacing); // (8 * 50) + (7 * 1) = 407mm
+    
     margin = {
-      horizontal: (sheet.width - (cols * cardWidth)) / 2,  // (297 - 288) / 2 = 4.5mm
-      vertical: (sheet.height - (rows * cardHeight)) / 2   // (420 - 392) / 2 = 14mm
+      horizontal: (sheet.width - totalWidth) / 2,  // (297 - 272) / 2 = 12.5mm
+      vertical: (sheet.height - totalHeight) / 2   // (420 - 407) / 2 = 6.5mm
     };
     
-    // If vertical margin is negative, try 4×6 layout instead
-    if (margin.vertical < 5) {
+    // Check if margins are acceptable (at least 5mm)
+    if (margin.horizontal < 5 || margin.vertical < 5) {
+      // Fallback to 4×6 layout if 3×8 doesn't fit well
       cols = 4;
       rows = 6;
-      margin = {
-        horizontal: (sheet.width - (cols * cardWidth)) / 2,
-        vertical: (sheet.height - (rows * cardHeight)) / 2
-      };
+      const totalWidth4x6 = (cols * cardWidth) + ((cols - 1) * cardSpacing);   // (4 * 90) + (3 * 1) = 363mm
+      const totalHeight4x6 = (rows * cardHeight) + ((rows - 1) * cardSpacing); // (6 * 50) + (5 * 1) = 305mm
       
-      // If horizontal margin is negative, use 3×7 layout for 21 cards
-      if (margin.horizontal < 5) {
-        cols = 3;
-        rows = 7;
+      // Check if 4×6 fits better (though it likely won't due to width)
+      if (totalWidth4x6 <= sheet.width && totalHeight4x6 <= sheet.height) {
         margin = {
-          horizontal: (sheet.width - (cols * cardWidth)) / 2,
-          vertical: (sheet.height - (rows * cardHeight)) / 2
+          horizontal: (sheet.width - totalWidth4x6) / 2,
+          vertical: (sheet.height - totalHeight4x6) / 2
+        };
+      } else {
+        // Revert to 3×8 as it's the best option for A3
+        cols = 3;
+        rows = 8;
+        margin = {
+          horizontal: (sheet.width - totalWidth) / 2,  // 12.5mm
+          vertical: (sheet.height - totalHeight) / 2   // 6.5mm
         };
       }
     }
@@ -72,6 +88,7 @@ function calculateLayout(sheetSize, cardCount) {
     startY,
     cardWidth,
     cardHeight,
+    cardSpacing,
     totalSheets: Math.ceil(cardCount / cardsPerSheet),
     margin
   };
@@ -89,9 +106,7 @@ async function processImageForPDF(file) {
 
 // Function to check if an image is predominantly white/light colored
 function shouldAddBorder(imageData) {
-  // For now, we'll add border to all cards since we can't easily analyze
-  // the image data in this context. In practice, light/white cards will
-  // benefit from the border for visibility during cutting.
+  // Add border to all cards for visibility during cutting
   return true;
 }
 
@@ -179,8 +194,10 @@ export async function POST(request) {
           if (cardIndex >= quantity) break;
           
           const imageIndex = cardIndex % processedFrontImages.length;
-          const x = mmToPoints(layout.startX + (col * layout.cardWidth));
-          const y = mmToPoints(sheet.height - layout.startY - (row * layout.cardHeight) - layout.cardHeight);
+          
+          // Calculate position with spacing
+          const x = mmToPoints(layout.startX + (col * (layout.cardWidth + layout.cardSpacing)));
+          const y = mmToPoints(sheet.height - layout.startY - (row * (layout.cardHeight + layout.cardSpacing)) - layout.cardHeight);
           
           const cardWidthPts = mmToPoints(layout.cardWidth);
           const cardHeightPts = mmToPoints(layout.cardHeight);
@@ -195,7 +212,7 @@ export async function POST(request) {
                 height: cardHeightPts,
               });
               
-              // Add subtle border to help distinguish card edges (especially for light/white cards)
+              // Add subtle border to help distinguish card edges
               if (shouldAddBorder(processedFrontImages[imageIndex])) {
                 page.drawRectangle({
                   x: x,
@@ -253,8 +270,8 @@ export async function POST(request) {
             const imageIndex = cardIndex % processedBackImages.length;
             // Mirror the column position for back side alignment
             const mirroredCol = layout.cols - 1 - col;
-            const x = mmToPoints(layout.startX + (mirroredCol * layout.cardWidth));
-            const y = mmToPoints(sheet.height - layout.startY - (row * layout.cardHeight) - layout.cardHeight);
+            const x = mmToPoints(layout.startX + (mirroredCol * (layout.cardWidth + layout.cardSpacing)));
+            const y = mmToPoints(sheet.height - layout.startY - (row * (layout.cardHeight + layout.cardSpacing)) - layout.cardHeight);
             
             const cardWidthPts = mmToPoints(layout.cardWidth);
             const cardHeightPts = mmToPoints(layout.cardHeight);
