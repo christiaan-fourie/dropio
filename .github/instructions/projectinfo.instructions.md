@@ -45,6 +45,12 @@ Create a web application for internal use in a printing store, built with Next.j
   - Professional PDF export with jsPDF
   - Cut marks and bleed handling
   - File management (add/remove individual files)
+  - **Insane Streamlined Settings & Upload Section:**  
+    - All print settings (sheet size, sheets, double-sided toggle) and image uploads are now grouped in a single, visually stunning, animated panel.
+    - Modern glassmorphism, gradients, and animated feedback for every state.
+    - Responsive grid layout for settings and uploads, with animated progress indicators.
+    - Interactive toggle for print mode with animated icon and color transitions.
+    - Upload zones feature animated borders, drag feedback, and file previews.
 
 ### 🔄 In Progress
 - Canvas wrap layout tool
@@ -91,8 +97,12 @@ Create a web application for internal use in a printing store, built with Next.j
 - **Visual Feedback:** Loading states, drag indicators, file status
 
 ### Business Card Interface
-- **Quick Settings Panel:** Sheet size, quantity, double-sided toggle
-- **File Upload Areas:** Separate front/back image zones with visual feedback
+- **Insane Streamlined Settings & Upload Panel:**  
+  - All controls (sheet size, sheets, double-sided toggle) and image uploads are in a single, animated, glassy panel.
+  - Animated gradients, blur, and micro-interactions for a premium feel.
+  - Toggle for print mode with animated icon and color transitions.
+  - Upload zones with animated borders, drag feedback, and file previews.
+  - Live progress indicators for upload, settings, and PDF readiness.
 - **Live Preview:** Real-time layout calculation and sheet preview
 - **Professional Controls:** Clear validation messages and error handling
 
@@ -103,8 +113,8 @@ Create a web application for internal use in a printing store, built with Next.j
 1. **Upload Images:** Drag & drop or click to select front images (and back if double-sided)
 2. **Configure Settings:**
    - Select sheet size (A4/A3)
-   - Set quantity (auto-suggested based on uploaded files)
-   - Enable double-sided if needed
+   - Set number of sheets (auto-suggested based on uploaded files)
+   - Enable double-sided if needed (animated toggle)
 3. **Preview Layout:** View live calculation of cards per sheet and total sheets
 4. **Generate PDF:** Download print-ready PDF with proper cut marks and alignment
 5. **Professional Output:** 300dpi CMYK PDF ready for printing
@@ -178,4 +188,4 @@ app/
 
 ---
 
-**Last Updated:** Current implementation status and technical details
+**Last Updated:** Now includes the new "insane" streamlined settings & upload panel and

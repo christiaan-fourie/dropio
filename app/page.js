@@ -17,7 +17,7 @@ const tools = [
         label: "Canvas Wrap",
         icon: FiImage,
         description: "Canvas layouts with wrap-around bleed",
-        status: "coming-soon"
+        status: "active"
     },
     {
         key: "flyers",
