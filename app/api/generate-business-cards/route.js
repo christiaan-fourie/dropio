@@ -116,7 +116,7 @@ export async function POST(request) {
     const frontFiles = formData.getAll('frontFiles');
     const backFiles = formData.getAll('backFiles');
     const sheetSize = formData.get('sheetSize');
-    const quantity = parseInt(formData.get('quantity'));
+    const sheets = parseInt(formData.get('sheets')); // CHANGED: now expects 'sheets'
     const doubleSided = formData.get('doubleSided') === 'true';
 
     // Validation
@@ -134,14 +134,16 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    if (!quantity || quantity < 1 || quantity > 10000) {
+    if (!sheets || sheets < 1 || sheets > 10000) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Invalid quantity' 
+        error: 'Invalid sheet count' 
       }, { status: 400 });
     }
 
-    const layout = calculateLayout(sheetSize, quantity);
+    const layout = calculateLayout(sheetSize, 1); // Get cardsPerSheet
+    const cardsPerSheet = layout.cardsPerSheet;
+    const totalCards = sheets * cardsPerSheet;
     const sheet = SHEET_SIZES[sheetSize];
     
     // Create PDF document
@@ -186,12 +188,12 @@ export async function POST(request) {
     let cardIndex = 0;
     
     // Generate front sheets
-    for (let sheetNum = 0; sheetNum < layout.totalSheets; sheetNum++) {
+    for (let sheetNum = 0; sheetNum < sheets; sheetNum++) {
       const page = pdfDoc.addPage([mmToPoints(sheet.width), mmToPoints(sheet.height)]);
       
       for (let row = 0; row < layout.rows; row++) {
         for (let col = 0; col < layout.cols; col++) {
-          if (cardIndex >= quantity) break;
+          if (cardIndex >= totalCards) break;
           
           const imageIndex = cardIndex % processedFrontImages.length;
           
@@ -252,7 +254,7 @@ export async function POST(request) {
           
           cardIndex++;
         }
-        if (cardIndex >= quantity) break;
+        if (cardIndex >= totalCards) break;
       }
     }
 
@@ -260,16 +262,16 @@ export async function POST(request) {
     if (doubleSided && processedBackImages.length) {
       cardIndex = 0;
       
-      for (let sheetNum = 0; sheetNum < layout.totalSheets; sheetNum++) {
+      for (let sheetNum = 0; sheetNum < sheets; sheetNum++) {
         const page = pdfDoc.addPage([mmToPoints(sheet.width), mmToPoints(sheet.height)]);
         
         for (let row = 0; row < layout.rows; row++) {
           for (let col = 0; col < layout.cols; col++) {
-            if (cardIndex >= quantity) break;
+            if (cardIndex >= totalCards) break;
             
             const imageIndex = cardIndex % processedBackImages.length;
-            // Mirror the column position for back side alignment
             const mirroredCol = layout.cols - 1 - col;
+            // Mirror the column position for back side alignment
             const x = mmToPoints(layout.startX + (mirroredCol * (layout.cardWidth + layout.cardSpacing)));
             const y = mmToPoints(sheet.height - layout.startY - (row * (layout.cardHeight + layout.cardSpacing)) - layout.cardHeight);
             
@@ -326,7 +328,7 @@ export async function POST(request) {
             
             cardIndex++;
           }
-          if (cardIndex >= quantity) break;
+          if (cardIndex >= totalCards) break;
         }
       }
     }
@@ -341,23 +343,15 @@ export async function POST(request) {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="business-cards-${sheetSize}-${quantity}qty${doubleSided ? '-doublesided' : ''}.pdf"`,
+        'Content-Disposition': `attachment; filename="business-cards-${sheetSize}-${sheets}sheets${doubleSided ? '-doublesided' : ''}.pdf"`,
         'Content-Length': pdfBytes.length.toString(),
       }
     });
-
   } catch (error) {
     console.error('PDF generation error:', error);
-    
-    return NextResponse.json({ 
-      success: false,
-      error: 'Failed to generate PDF', 
-      details: error.message || 'Unknown error occurred'
-    }, { 
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to generate PDF' },
+      { status: 500 }
+    );
   }
 }

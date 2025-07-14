@@ -73,10 +73,21 @@ export default function BusinessCards() {
   const [frontFiles, setFrontFiles] = useState([]);
   const [backFiles, setBackFiles] = useState([]);
   const [sheetSize, setSheetSize] = useState("A4");
-  const [quantity, setQuantity] = useState(100);
+  const [sheets, setSheets] = useState(10); // Now represents sheets, not cards
   const [doubleSided, setDoubleSided] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+
+  const layout = calculateLayout(sheetSize, sheets * calculateLayout(sheetSize, 1).cardsPerSheet);
+  const totalCards = sheets * layout.cardsPerSheet;
+
+  // Auto-adjust sheets to fit all uploaded images
+  useEffect(() => {
+    if (frontFiles.length > 0 && frontFiles.length <= 500) {
+      const neededSheets = Math.ceil(frontFiles.length / layout.cardsPerSheet);
+      if (sheets < neededSheets) setSheets(neededSheets);
+    }
+  }, [frontFiles.length, layout.cardsPerSheet]);
 
   const onDropFront = (acceptedFiles) => {
     setFrontFiles(prev => [...prev, ...acceptedFiles]);
@@ -103,16 +114,6 @@ export default function BusinessCards() {
     disabled: !doubleSided,
   });
 
-  const layout = calculateLayout(sheetSize, quantity);
-
-  // Auto-adjust quantity to match uploaded images
-  useEffect(() => {
-    if (frontFiles.length > 0 && frontFiles.length <= 500 && quantity === 100) {
-      const suggestedQty = Math.max(frontFiles.length, Math.ceil(frontFiles.length / layout.cardsPerSheet) * layout.cardsPerSheet);
-      setQuantity(suggestedQty);
-    }
-  }, [frontFiles.length, layout.cardsPerSheet]);
-
   // Clear back files when double-sided is turned off
   useEffect(() => {
     if (!doubleSided) {
@@ -130,24 +131,19 @@ export default function BusinessCards() {
 
   const handleGeneratePDF = async () => {
     if (frontFiles.length === 0) return;
-    
     if (doubleSided && backFiles.length === 0) {
       alert('Please upload back images for double-sided printing or disable the double-sided option.');
       return;
     }
-    
     setIsGenerating(true);
-    
     try {
       const formData = new FormData();
-      
       frontFiles.forEach(file => formData.append('frontFiles', file));
       if (doubleSided && backFiles.length) {
         backFiles.forEach(file => formData.append('backFiles', file));
       }
-      
       formData.append('sheetSize', sheetSize);
-      formData.append('quantity', quantity.toString());
+      formData.append('sheets', sheets.toString());
       formData.append('doubleSided', doubleSided.toString());
 
       const response = await fetch('/api/generate-business-cards', {
@@ -170,12 +166,11 @@ export default function BusinessCards() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `business-cards-${sheetSize}-${quantity}qty${doubleSided ? '-doublesided' : ''}.pdf`;
+      a.download = `business-cards-${sheetSize}-${sheets}sheets${doubleSided ? '-doublesided' : ''}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert(`Failed to generate PDF: ${error.message}`);
@@ -202,7 +197,7 @@ export default function BusinessCards() {
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="font-medium text-gray-700">{layout.totalSheets} sheets needed</span>
+                <span className="font-medium text-gray-700">{sheets} sheets ({totalCards} cards)</span>
               </div>
               {doubleSided && (
                 <div className="flex items-center space-x-2">
@@ -233,20 +228,21 @@ export default function BusinessCards() {
                   onChange={(e) => setSheetSize(e.target.value)}
                   className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="A4">A4 (10 cards)</option>
-                  <option value="A3">A3 (24 cards)</option>
+                  <option value="A4">A4 (10 cards/sheet)</option>
+                  <option value="A3">A3 (24 cards/sheet)</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Sheets</label>
                 <input
                   type="number"
                   min={1}
-                  max={10000}
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  max={1000}
+                  value={sheets}
+                  onChange={(e) => setSheets(Number(e.target.value))}
                   className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <div className="text-xs text-gray-500 mt-1">{totalCards} cards total</div>
               </div>
               <div className="flex items-center">
                 <input
@@ -429,7 +425,7 @@ export default function BusinessCards() {
                     }}
                   >
                     {/* Cards with spacing visualization */}
-                    {Array.from({ length: Math.min(layout.cardsPerSheet, quantity) }).map((_, index) => {
+                    {Array.from({ length: Math.min(layout.cardsPerSheet, totalCards) }).map((_, index) => {
                       const row = Math.floor(index / layout.cols);
                       const col = index % layout.cols;
                       
