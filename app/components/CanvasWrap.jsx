@@ -134,9 +134,9 @@ export default function CanvasWrap() {
   const selectedPreset = CANVAS_PRESETS.find(p => p.key === wrapSize);
 
   return (
-    <div className="max-w-3xl mx-auto p-8">
-      <div className="text-center mb-8">
-        <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+    <div className="p-8">
+      <div className="text-left mb-8">
+        <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mb-4">
           <FiImage className="w-7 h-7 text-amber-600" />
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Canvas Wrap Tool</h2>

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Create a web application for internal use in a printing store, built with Next.js. The tool provides automated layout creation for print jobs such as business cards and canvas wraps. The UI features a clean dashboard interface with easy navigation between different print tools.
+Create a web application for internal use in a printing store, built with Next.js. The tool provides automated layout creation for print jobs such as business cards, canvas wraps, and custom size layouts. The UI features a clean dashboard interface with easy navigation between different print tools.
 
 ---
 
@@ -11,24 +11,27 @@ Create a web application for internal use in a printing store, built with Next.j
 ### 1. Automated Image Layout System
 - **Input:** Users upload images in common formats (PNG, JPEG, TIFF, PDF).
 - **Automatic Layout:**  
-  - **Business Cards:** Arrange 9×5 cm cards optimally on A4 or A3 sheets with 3mm bleed per card.
+  - **Business Cards:** Arrange 9×5 cm cards optimally on A4 or A3 sheets with 1mm spacing between cards.
+  - **Canvas Wraps:** Allow wrap-around layouts (e.g., A3 canvas with 3.5cm bleed per side, print on A2).
+  - **Custom Size Layout:** Flexible dimensions with automatic optimization across sheets with 1mm spacing.
   - **Double-sided Support:** Generate properly aligned back sheets with horizontal mirroring for duplex printing.
-  - **Canvas Wraps:** Allow wrap-around layouts (e.g., A3 canvas with 3.5 cm bleed per side, print on A2).
-  - **Smart Fitting:** Automatic calculation of cards per sheet and total sheets needed.
+  - **Smart Fitting:** Automatic calculation of items per sheet and total sheets needed.
+  - **Smart Orientation:** Automatic detection and rotation of portrait images to optimal orientation.
 - **No Design Tools Required:** Template selection, options, and image upload only.
 
 ### 2. Professional Print Export
 - **Output:** 300dpi, CMYK, print-ready PDFs with proper cut marks.
 - **Features:** 
   - Correct sheet sizing with professional margins
-  - Bleed handling for trim-safe printing
+  - 1mm spacing handling for easy cutting
   - Cut marks and registration marks
   - Optimized for offset and digital printing
+  - Smart orientation detection and automatic rotation
 
 ### 3. Modular & Extensible Architecture
 - Component-based structure for easy addition of new print products.
 - Reusable layout calculation functions.
-- Standardized PDF generation pipeline.
+- Standardized PDF generation pipeline with pdf-lib.
 - Internal use only - no authentication or order management.
 
 ---
@@ -39,29 +42,36 @@ Create a web application for internal use in a printing store, built with Next.j
 - **Business Card Layout Tool:**
   - Multi-file drag & drop upload with React Dropzone
   - Live layout preview with sheet visualization
-  - A4/A3 sheet size support
-  - Double-sided printing with proper alignment
-  - Quantity management with smart suggestions
-  - Professional PDF export with jsPDF
-  - Cut marks and bleed handling
+  - A4/A3 sheet size support (10 cards on A4, 24 cards on A3)
+  - Double-sided printing with proper alignment and mirroring
+  - Smart portrait image detection and automatic 90° rotation
+  - Sheets management with smart suggestions
+  - Professional PDF export with pdf-lib
+  - 1mm spacing between cards for easy cutting (no bleed)
   - File management (add/remove individual files)
-  - **Insane Streamlined Settings & Upload Section:**  
-    - All print settings (sheet size, sheets, double-sided toggle) and image uploads are now grouped in a single, visually stunning, animated panel.
-    - Modern glassmorphism, gradients, and animated feedback for every state.
-    - Responsive grid layout for settings and uploads, with animated progress indicators.
-    - Interactive toggle for print mode with animated icon and color transitions.
-    - Upload zones feature animated borders, drag feedback, and file previews.
+  - **Streamlined Settings & Upload Interface:**  
+    - All print settings (sheet size, sheets, double-sided toggle) and image uploads in a single animated panel
+    - Modern glassmorphism design with gradients and micro-interactions
+    - Responsive grid layout with animated progress indicators
+    - Interactive toggle for print mode with animated transitions
+    - Upload zones with animated borders, drag feedback, and file previews
+
+- **Canvas Wrap Layout Tool:**
+  - Custom canvas dimensions with thickness and wrap calculations
+  - Automatic bleed calculation for gallery wraps
+  - Optimal sheet size selection and orientation
+  - Professional canvas stretching layouts
+  - Clean export with artwork only (no guide lines)
 
 ### 🔄 In Progress
-- Canvas wrap layout tool
-- Enhanced preview system
-- Additional sheet sizes
+- Custom size layout tool
+- Enhanced preview system with layout visualization
 
 ### 📋 Planned Features
-- Flyer layout tool
-- Poster layout system
 - Multi-format export options
 - Advanced cut mark customization
+- Batch processing capabilities
+- Print estimation tools
 
 ---
 
@@ -72,13 +82,13 @@ Create a web application for internal use in a printing store, built with Next.j
 - **UI Library:** Tailwind CSS for styling
 - **Components:** React with TypeScript support
 - **File Upload:** react-dropzone for drag & drop
-- **Icons:** React Icons (Feather icons)
+- **Icons:** React Icons (Feather icons, Font Awesome)
 - **State Management:** React hooks (useState, useEffect)
 
 ### Backend/API
 - **API Routes:** Next.js API routes
-- **PDF Generation:** jsPDF for browser-compatible PDF creation
-- **Image Processing:** Browser-based base64 conversion
+- **PDF Generation:** pdf-lib for professional PDF creation
+- **Image Processing:** Browser-based processing with smart orientation detection
 - **File Handling:** FormData API for multipart uploads
 
 ### Development Tools
@@ -88,36 +98,70 @@ Create a web application for internal use in a printing store, built with Next.j
 
 ---
 
-## User Interface Design
+## Print Tool Specifications
 
-### Dashboard Layout
-- **Sidebar Navigation:** Clean vertical sidebar with tool selection
-- **Main Content Area:** Tool-specific interfaces with drag & drop zones
-- **Responsive Design:** Works on desktop and tablet devices
-- **Visual Feedback:** Loading states, drag indicators, file status
+### Business Cards
+- **Dimensions:** 90×50mm (landscape orientation)
+- **Layouts:** 
+  - A4: 2×5 grid = 10 cards per sheet
+  - A3: 3×8 grid = 24 cards per sheet
+- **Spacing:** 1mm between cards
+- **Bleed:** None (clean cutting lines)
+- **Smart Features:** Auto-rotation of portrait images
 
-### Business Card Interface
-- **Insane Streamlined Settings & Upload Panel:**  
-  - All controls (sheet size, sheets, double-sided toggle) and image uploads are in a single, animated, glassy panel.
-  - Animated gradients, blur, and micro-interactions for a premium feel.
-  - Toggle for print mode with animated icon and color transitions.
-  - Upload zones with animated borders, drag feedback, and file previews.
-  - Live progress indicators for upload, settings, and PDF readiness.
-- **Live Preview:** Real-time layout calculation and sheet preview
-- **Professional Controls:** Clear validation messages and error handling
+### Canvas Wraps
+- **Presets:** A4 to A0 canvas sizes + custom square formats
+- **Bleed Calculation:** Thickness + extra fold allowance
+- **Sheet Selection:** Automatic optimal sheet size and orientation
+- **Professional Output:** Artwork-only export for canvas stretching
+
+### Custom Size Layout (Planned)
+- **Flexible Dimensions:** User-defined width and height
+- **Smart Layout:** Automatic grid calculation for optimal sheet usage
+- **Spacing:** 1mm between items
+- **Double-sided Support:** Mirrored back alignment
+- **Orientation Detection:** Auto-rotation for optimal fit
 
 ---
 
-## Workflow Example: Business Card Layout
+## User Interface Design
 
-1. **Upload Images:** Drag & drop or click to select front images (and back if double-sided)
-2. **Configure Settings:**
-   - Select sheet size (A4/A3)
-   - Set number of sheets (auto-suggested based on uploaded files)
-   - Enable double-sided if needed (animated toggle)
-3. **Preview Layout:** View live calculation of cards per sheet and total sheets
-4. **Generate PDF:** Download print-ready PDF with proper cut marks and alignment
-5. **Professional Output:** 300dpi CMYK PDF ready for printing
+### Dashboard Layout
+- **Sidebar Navigation:** Clean vertical sidebar with tool selection and status indicators
+- **Main Content Area:** Tool-specific interfaces with streamlined controls
+- **Responsive Design:** Optimized for desktop and tablet devices
+- **Visual Feedback:** Loading states, drag indicators, file status, animated transitions
+
+### Tool Interface Standards
+- **Streamlined Settings Panel:**  
+  - All controls in a single, visually stunning, animated panel
+  - Glassmorphism design with animated gradients and blur effects
+  - Smart toggles with animated icons and color transitions
+  - Live progress indicators and status feedback
+- **Smart Upload Zones:** 
+  - Animated borders with drag feedback
+  - File previews with management controls
+  - Multi-file support with overflow handling
+- **Live Preview:** Real-time layout calculation and sheet visualization
+- **Professional Controls:** Clear validation and comprehensive error handling
+
+---
+
+## Workflow Examples
+
+### Business Card Layout
+1. **Upload Images:** Drag & drop front images (auto-detects portrait and rotates)
+2. **Configure Settings:** Sheet size (A4/A3), number of sheets, double-sided toggle
+3. **Preview Layout:** Live calculation showing 10/24 cards per sheet arrangement
+4. **Generate PDF:** Professional output with 1mm spacing and cutting guides
+5. **Professional Output:** 300dpi CMYK PDF ready for immediate printing
+
+### Canvas Wrap Layout
+1. **Select Canvas Size:** Choose preset or custom dimensions
+2. **Configure Wrap:** Set thickness and fold allowances
+3. **Upload Artwork:** High-resolution images for canvas printing
+4. **Auto-Optimization:** System selects optimal sheet size and orientation
+5. **Generate PDF:** Clean artwork export ready for canvas stretching
 
 ---
 
@@ -127,19 +171,23 @@ Create a web application for internal use in a printing store, built with Next.j
 ```
 app/
 ├── components/
-│   ├── BusinessCards.jsx (Main business card tool)
-│   ├── Sidebar.jsx (Navigation component)
-│   └── Layout.jsx (Dashboard wrapper)
+│   ├── BusinessCards.jsx (Business card layout tool)
+│   ├── CanvasWrap.jsx (Canvas wrap tool)
+│   ├── CustomSize.jsx (Planned - Custom size layout)
+│   └── shared/ (Reusable components)
 ├── api/
-│   └── generate-business-cards/
-│       └── route.js (PDF generation endpoint)
-└── page.js (Main dashboard)
+│   ├── generate-business-cards/route.js (Business card PDF generation)
+│   ├── generate-canvas-wrap/route.js (Canvas PDF generation)
+│   └── generate-custom-size/route.js (Planned)
+└── page.js (Main dashboard with tool navigation)
 ```
 
 ### Key Functions
-- **calculateLayout():** Optimal card arrangement calculation
-- **processImageForPDF():** Image to base64 conversion
-- **PDF Generation:** Professional layout with cut marks and bleed
+- **calculateLayout():** Optimal arrangement calculation with spacing
+- **getSmartImageDimensions():** Portrait detection and rotation logic
+- **drawImageWithOrientation():** Smart image placement with rotation
+- **processImageForPDF():** Image processing and embedding
+- **PDF Generation:** Professional layouts with pdf-lib
 
 ---
 
@@ -148,34 +196,36 @@ app/
 ### Print Requirements
 - **Resolution:** Minimum 300dpi for all outputs
 - **Color Space:** CMYK color profile for professional printing
-- **Bleed:** 3mm bleed on all print products
-- **Cut Marks:** Professional registration and trim marks
+- **Spacing:** 1mm spacing between all items for easy cutting
+- **Cut Marks:** Professional registration and trim guides
+- **Orientation:** Smart detection and automatic correction
 
 ### Code Quality
-- **Modular Design:** Reusable components and functions
+- **Modular Design:** Reusable components and layout functions
 - **Error Handling:** Comprehensive validation and user feedback
 - **Performance:** Optimized image processing and PDF generation
-- **Maintainability:** Clear code structure and documentation
+- **Maintainability:** Clear code structure with consistent patterns
 
 ---
 
 ## Future Roadmap
 
 ### Phase 1 (Current)
-- Complete business card tool
-- Basic dashboard structure
-- Professional PDF output
+- ✅ Business card tool with smart orientation
+- ✅ Canvas wrap tool
+- ✅ Professional PDF output with pdf-lib
+- ✅ Dashboard structure with tool navigation
 
 ### Phase 2 (Next)
-- Canvas wrap tool implementation
-- Enhanced preview system
-- Additional sheet sizes (A2, custom)
+- 🔄 Custom size layout tool
+- 🔄 Enhanced preview system with visual layout guides
+- 📋 Additional sheet sizes (A2, custom formats)
 
 ### Phase 3 (Future)
-- Flyer and poster tools
-- Batch processing capabilities
-- Advanced cut mark options
-- Print estimation tools
+- 📋 Batch processing capabilities
+- 📋 Advanced cut mark customization
+- 📋 Print estimation and costing tools
+- 📋 Export format options (multi-page, separated files)
 
 ---
 
@@ -185,7 +235,9 @@ app/
 - **Browser Compatibility:** Modern browsers supporting ES6+ and Canvas API
 - **File Size Limits:** Reasonable limits for print-quality images
 - **Performance:** Client-side processing for responsive user experience
+- **Smart Features:** Automatic orientation detection reduces user errors
+- **Professional Output:** All PDFs optimized for commercial printing workflows
 
 ---
 
-**Last Updated:** Now includes the new "insane" streamlined settings & upload panel and
+**Last Updated:** Now includes smart orientation detection, 1mm spacing system, and updated roadmap focusing on custom size layouts

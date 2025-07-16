@@ -1,16 +1,17 @@
 'use client'
 
 import { useState } from "react";
-import { FiCreditCard, FiImage, FiFileText, FiPrinter } from "react-icons/fi";
+import { FiCreditCard, FiImage, FiGrid, FiPrinter } from "react-icons/fi";
 import BusinessCards from "./components/BusinessCards";
 import CanvasWrap from "./components/CanvasWrap";
+import CustomLayout from "./components/CustomLayout";
 
 const tools = [
     {
         key: "business-cards",
         label: "Business Cards",
         icon: FiCreditCard,
-        description: "9×5cm cards with 3mm bleed on A4/A3 sheets",
+        description: "90×50mm cards with 1mm spacing on A4/A3 sheets",
         status: "active"
     },
     {
@@ -21,18 +22,11 @@ const tools = [
         status: "active"
     },
     {
-        key: "flyers",
-        label: "Flyers",
-        icon: FiFileText,
-        description: "Standard flyer layouts and formats",
-        status: "planned"
-    },
-    {
-        key: "posters",
-        label: "Posters",
-        icon: FiPrinter,
-        description: "Large format poster arrangements",
-        status: "planned"
+        key: "custom-layout",
+        label: "Custom Size Layout",
+        icon: FiGrid,
+        description: "Flexible dimensions with auto sheet optimization",
+        status: "preview"
     },
 ];
 
@@ -64,7 +58,7 @@ export default function Home() {
                         {tools.map((tool) => {
                             const IconComponent = tool.icon;
                             const isSelected = selectedTool === tool.key;
-                            const isDisabled = tool.status !== 'active';
+                            const isDisabled = tool.status === 'planned';
                             
                             return (
                                 <button
@@ -109,6 +103,17 @@ export default function Home() {
                             );
                         })}
                     </div>
+
+                    {/* Tools Info Section */}
+                    <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <h3 className="text-sm font-medium text-blue-900 mb-2">Smart Features</h3>
+                        <ul className="text-xs text-blue-700 space-y-1">
+                            <li>• Auto orientation detection</li>
+                            <li>• 1mm spacing for easy cutting</li>
+                            <li>• Double-sided alignment</li>
+                            <li>• 300dpi print-ready output</li>
+                        </ul>
+                    </div>
                 </nav>
 
                 {/* Footer */}
@@ -135,16 +140,19 @@ export default function Home() {
                     </div>
                 )}
 
-                {(selectedTool === "flyers" || selectedTool === "posters") && (
+                {selectedTool === "custom-layout" && (
+                    <div className="h-full">
+                        <CustomLayout />
+                    </div>
+                )}
+
+                {/* Placeholder for future tools */}
+                {!["business-cards", "canvas-wrap", "custom-layout"].includes(selectedTool) && (
                     <div className="p-8">
                         <div className="max-w-4xl mx-auto">
                             <div className="text-center">
                                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    {selectedTool === "flyers" ? (
-                                        <FiFileText className="w-8 h-8 text-gray-600" />
-                                    ) : (
-                                        <FiPrinter className="w-8 h-8 text-gray-600" />
-                                    )}
+                                    {activeTool?.icon && <activeTool.icon className="w-8 h-8 text-gray-600" />}
                                 </div>
                                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
                                     {activeTool?.label}
@@ -154,7 +162,7 @@ export default function Home() {
                                 </p>
                                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-w-md mx-auto">
                                     <p className="text-sm text-gray-700">
-                                        <strong>Planned Feature:</strong> This tool is planned for a future release 
+                                        <strong>Coming Soon:</strong> This tool is in development 
                                         as part of our expanding print layout system.
                                     </p>
                                 </div>
