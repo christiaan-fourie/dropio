@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, degrees } from 'pdf-lib';
 
 const BUSINESS_CARD = {
   width: 90,  // 9cm in mm
@@ -104,6 +104,52 @@ async function processImageForPDF(file) {
   }
 }
 
+// Smart orientation detection for business cards
+function getSmartImageDimensions(image) {
+  const imageWidth = image.width;
+  const imageHeight = image.height;
+  const cardAspectRatio = BUSINESS_CARD.width / BUSINESS_CARD.height; // 90/50 = 1.8
+  const imageAspectRatio = imageWidth / imageHeight;
+  
+  // Standard business card is landscape (width > height)
+  // If image is portrait (height > width), we need to rotate it
+  const needsRotation = imageAspectRatio < 1; // Portrait image
+  
+  return {
+    needsRotation,
+    originalWidth: imageWidth,
+    originalHeight: imageHeight,
+    finalWidth: needsRotation ? imageHeight : imageWidth,
+    finalHeight: needsRotation ? imageWidth : imageHeight,
+    rotation: needsRotation ? 90 : 0
+  };
+}
+
+// Function to draw image with smart orientation
+function drawImageWithOrientation(page, image, x, y, cardWidthPts, cardHeightPts) {
+  const orientation = getSmartImageDimensions(image);
+  
+  if (orientation.needsRotation) {
+    // For rotated images, we need to adjust the positioning
+    // Rotate 90 degrees clockwise and adjust position
+    page.drawImage(image, {
+      x: x + cardWidthPts, // Move to right edge
+      y: y, // Keep Y position
+      width: cardHeightPts, // Swap dimensions
+      height: cardWidthPts,
+      rotate: degrees(90), // Rotate 90 degrees clockwise
+    });
+  } else {
+    // Normal landscape orientation
+    page.drawImage(image, {
+      x: x,
+      y: y,
+      width: cardWidthPts,
+      height: cardHeightPts,
+    });
+  }
+}
+
 // Function to check if an image is predominantly white/light colored
 function shouldAddBorder(imageData) {
   // Add border to all cards for visibility during cutting
@@ -116,7 +162,7 @@ export async function POST(request) {
     const frontFiles = formData.getAll('frontFiles');
     const backFiles = formData.getAll('backFiles');
     const sheetSize = formData.get('sheetSize');
-    const sheets = parseInt(formData.get('sheets')); // CHANGED: now expects 'sheets'
+    const sheets = parseInt(formData.get('sheets'));
     const doubleSided = formData.get('doubleSided') === 'true';
 
     // Validation
@@ -141,7 +187,7 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const layout = calculateLayout(sheetSize, 1); // Get cardsPerSheet
+    const layout = calculateLayout(sheetSize, 1);
     const cardsPerSheet = layout.cardsPerSheet;
     const totalCards = sheets * cardsPerSheet;
     const sheet = SHEET_SIZES[sheetSize];
@@ -149,16 +195,23 @@ export async function POST(request) {
     // Create PDF document
     const pdfDoc = await PDFDocument.create();
     
-    // Process images
+    // Process images with orientation detection
     const processedFrontImages = await Promise.all(
       frontFiles.map(async (file) => {
         const imageBytes = await processImageForPDF(file);
         try {
+          let embeddedImage;
           if (file.type === 'image/png') {
-            return await pdfDoc.embedPng(imageBytes);
+            embeddedImage = await pdfDoc.embedPng(imageBytes);
           } else {
-            return await pdfDoc.embedJpg(imageBytes);
+            embeddedImage = await pdfDoc.embedJpg(imageBytes);
           }
+          
+          // Log orientation info for debugging
+          const orientation = getSmartImageDimensions(embeddedImage);
+          console.log(`Image ${file.name}: ${orientation.originalWidth}x${orientation.originalHeight}, rotation: ${orientation.rotation}°`);
+          
+          return embeddedImage;
         } catch (error) {
           console.warn(`Failed to embed image ${file.name}, using fallback`);
           return null;
@@ -172,11 +225,18 @@ export async function POST(request) {
         backFiles.map(async (file) => {
           const imageBytes = await processImageForPDF(file);
           try {
+            let embeddedImage;
             if (file.type === 'image/png') {
-              return await pdfDoc.embedPng(imageBytes);
+              embeddedImage = await pdfDoc.embedPng(imageBytes);
             } else {
-              return await pdfDoc.embedJpg(imageBytes);
+              embeddedImage = await pdfDoc.embedJpg(imageBytes);
             }
+            
+            // Log orientation info for debugging
+            const orientation = getSmartImageDimensions(embeddedImage);
+            console.log(`Back image ${file.name}: ${orientation.originalWidth}x${orientation.originalHeight}, rotation: ${orientation.rotation}°`);
+            
+            return embeddedImage;
           } catch (error) {
             console.warn(`Failed to embed back image ${file.name}`);
             return null;
@@ -204,15 +264,10 @@ export async function POST(request) {
           const cardWidthPts = mmToPoints(layout.cardWidth);
           const cardHeightPts = mmToPoints(layout.cardHeight);
           
-          // Add image if available
+          // Add image if available with smart orientation
           if (processedFrontImages[imageIndex]) {
             try {
-              page.drawImage(processedFrontImages[imageIndex], {
-                x: x,
-                y: y,
-                width: cardWidthPts,
-                height: cardHeightPts,
-              });
+              drawImageWithOrientation(page, processedFrontImages[imageIndex], x, y, cardWidthPts, cardHeightPts);
               
               // Add subtle border to help distinguish card edges
               if (shouldAddBorder(processedFrontImages[imageIndex])) {
@@ -278,15 +333,10 @@ export async function POST(request) {
             const cardWidthPts = mmToPoints(layout.cardWidth);
             const cardHeightPts = mmToPoints(layout.cardHeight);
             
-            // Add back image if available
+            // Add back image if available with smart orientation
             if (processedBackImages[imageIndex]) {
               try {
-                page.drawImage(processedBackImages[imageIndex], {
-                  x: x,
-                  y: y,
-                  width: cardWidthPts,
-                  height: cardHeightPts,
-                });
+                drawImageWithOrientation(page, processedBackImages[imageIndex], x, y, cardWidthPts, cardHeightPts);
                 
                 // Add subtle border to back side as well
                 if (shouldAddBorder(processedBackImages[imageIndex])) {
