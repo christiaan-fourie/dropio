@@ -479,7 +479,7 @@ export default function BusinessCards() {
           <button
             onClick={handleGeneratePDF}
             disabled={!canGenerate || isGenerating}
-            className={`px-6 py-3 rounded-full text-white font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500
+            className={`z-50 px-6 py-3 rounded-full text-white font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500
               ${canGenerate ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600' : 'bg-gray-300 cursor-not-allowed'}
               ${isGenerating ? 'opacity-75 cursor-wait' : ''}`}
           >
