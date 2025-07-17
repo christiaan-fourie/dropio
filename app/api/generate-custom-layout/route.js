@@ -16,6 +16,27 @@ function calculateOptimalLayout(itemWidth, itemHeight, sheetSize, quantity) {
   const sheet = SHEET_SIZES[sheetSize];
   const itemSpacing = 1; // 1mm space between items
   
+  // For very large items that exceed sheet dimensions, return single item layout
+  if (itemWidth > sheet.width || itemHeight > sheet.height) {
+    return {
+      cols: 1,
+      rows: 1,
+      itemsPerSheet: 1,
+      totalWidth: itemWidth,
+      totalHeight: itemHeight,
+      margin: {
+        horizontal: Math.max(0, (sheet.width - itemWidth) / 2),
+        vertical: Math.max(0, (sheet.height - itemHeight) / 2)
+      },
+      itemWidth,
+      itemHeight,
+      itemSpacing,
+      totalSheets: quantity,
+      sheetSize,
+      oversized: true
+    };
+  }
+  
   // Try different grid configurations to find the best fit
   let bestLayout = null;
   let maxItemsPerSheet = 0;
@@ -55,8 +76,25 @@ function calculateOptimalLayout(itemWidth, itemHeight, sheetSize, quantity) {
     }
   }
   
+  // If no layout found, return single item layout
   if (!bestLayout) {
-    throw new Error(`Items (${itemWidth}×${itemHeight}mm) are too large for ${sheetSize} sheet`);
+    return {
+      cols: 1,
+      rows: 1,
+      itemsPerSheet: 1,
+      totalWidth: itemWidth,
+      totalHeight: itemHeight,
+      margin: {
+        horizontal: Math.max(0, (sheet.width - itemWidth) / 2),
+        vertical: Math.max(0, (sheet.height - itemHeight) / 2)
+      },
+      itemWidth,
+      itemHeight,
+      itemSpacing,
+      totalSheets: quantity,
+      sheetSize,
+      oversized: true
+    };
   }
   
   return {
@@ -65,40 +103,61 @@ function calculateOptimalLayout(itemWidth, itemHeight, sheetSize, quantity) {
     itemHeight,
     itemSpacing,
     totalSheets: Math.ceil(quantity / bestLayout.itemsPerSheet),
-    sheetSize
+    sheetSize,
+    oversized: false
   };
 }
 
 function findBestSheetSize(itemWidth, itemHeight, quantity) {
   const sheetOrder = ['A4', 'A3', 'A2', 'A1', 'A0'];
   
+  // For extremely large items, go straight to A0
+  if (itemWidth > 841 || itemHeight > 841) {
+    const layout = calculateOptimalLayout(itemWidth, itemHeight, 'A0', quantity);
+    const efficiency = layout.oversized ? 0.1 : 
+      (layout.itemsPerSheet * layout.itemWidth * layout.itemHeight) / 
+      (SHEET_SIZES['A0'].width * SHEET_SIZES['A0'].height);
+    
+    return { layout, sheetSize: 'A0', efficiency };
+  }
+  
   for (const sheetSize of sheetOrder) {
-    try {
-      const layout = calculateOptimalLayout(itemWidth, itemHeight, sheetSize, quantity);
-      
-      // Prefer layouts that minimize waste and sheets
-      const efficiency = (layout.itemsPerSheet * layout.itemWidth * layout.itemHeight) / 
-                        (SHEET_SIZES[sheetSize].width * SHEET_SIZES[sheetSize].height);
-      
-      // If efficiency is reasonable (>20%) and fits quantity well, use this sheet
-      if (efficiency > 0.2 || sheetSize === 'A0') {
-        return { layout, sheetSize, efficiency };
-      }
-    } catch (error) {
-      continue; // Try next sheet size
+    const layout = calculateOptimalLayout(itemWidth, itemHeight, sheetSize, quantity);
+    
+    // Calculate efficiency
+    const efficiency = layout.oversized ? 0.1 : 
+      (layout.itemsPerSheet * layout.itemWidth * layout.itemHeight) / 
+      (SHEET_SIZES[sheetSize].width * SHEET_SIZES[sheetSize].height);
+    
+    // For large items (>500mm), accept lower efficiency thresholds
+    const efficiencyThreshold = (itemWidth > 500 || itemHeight > 500) ? 0.1 : 0.15;
+    
+    // If efficiency is reasonable or it's the largest sheet, use this
+    if (efficiency > efficiencyThreshold || sheetSize === 'A0') {
+      return { layout, sheetSize, efficiency };
     }
   }
   
-  throw new Error('Items are too large for any available sheet size');
+  // Fallback to A0 with single item layout
+  const layout = calculateOptimalLayout(itemWidth, itemHeight, 'A0', quantity);
+  const efficiency = 0.1; // Low efficiency for oversized items
+  
+  return { layout, sheetSize: 'A0', efficiency };
 }
 
 async function processImageForPDF(file) {
   try {
+    // Validate file size (increased limit for large format)
+    const maxSize = 50 * 1024 * 1024; // 50MB for large format images
+    if (file.size > maxSize) {
+      throw new Error(`File ${file.name} is too large (max 50MB)`);
+    }
+    
     const buffer = await file.arrayBuffer();
     return new Uint8Array(buffer);
   } catch (error) {
     console.error('Error processing image:', error);
-    throw new Error(`Failed to process image: ${file.name}`);
+    throw new Error(`Failed to process image: ${file.name} - ${error.message}`);
   }
 }
 
@@ -126,32 +185,76 @@ function getSmartImageDimensions(image, itemWidth, itemHeight) {
 }
 
 // Function to draw image with smart orientation for custom layouts
-function drawImageWithOrientation(page, image, x, y, itemWidthPts, itemHeightPts, itemWidth, itemHeight) {
-  const orientation = getSmartImageDimensions(image, itemWidth, itemHeight);
-  
-  if (orientation.needsRotation) {
-    // Rotate 90 degrees clockwise and adjust position
-    page.drawImage(image, {
-      x: x + itemWidthPts, // Move to right edge
-      y: y, // Keep Y position
-      width: itemHeightPts, // Swap dimensions
-      height: itemWidthPts,
-      rotate: degrees(90), // Rotate 90 degrees clockwise
-    });
-  } else {
-    // Normal orientation
-    page.drawImage(image, {
-      x: x,
-      y: y,
-      width: itemWidthPts,
-      height: itemHeightPts,
-    });
+function drawImageWithOrientation(page, image, x, y, itemWidthPts, itemHeightPts, itemWidth, itemHeight, layout) {
+  try {
+    const orientation = getSmartImageDimensions(image, itemWidth, itemHeight);
+    
+    // For oversized items, ensure image doesn't exceed sheet bounds
+    if (layout.oversized) {
+      const sheetWidthPts = mmToPoints(SHEET_SIZES[layout.sheetSize].width);
+      const sheetHeightPts = mmToPoints(SHEET_SIZES[layout.sheetSize].height);
+      
+      // Adjust dimensions if needed
+      const maxWidthPts = Math.min(itemWidthPts, sheetWidthPts - mmToPoints(10)); // 5mm margin each side
+      const maxHeightPts = Math.min(itemHeightPts, sheetHeightPts - mmToPoints(10)); // 5mm margin each side
+      
+      // Scale proportionally if needed
+      const scaleX = maxWidthPts / itemWidthPts;
+      const scaleY = maxHeightPts / itemHeightPts;
+      const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
+      
+      const finalWidthPts = itemWidthPts * scale;
+      const finalHeightPts = itemHeightPts * scale;
+      
+      // Center oversized items
+      const centerX = (sheetWidthPts - finalWidthPts) / 2;
+      const centerY = (sheetHeightPts - finalHeightPts) / 2;
+      
+      if (orientation.needsRotation) {
+        page.drawImage(image, {
+          x: centerX + finalWidthPts,
+          y: centerY,
+          width: finalHeightPts,
+          height: finalWidthPts,
+          rotate: degrees(90),
+        });
+      } else {
+        page.drawImage(image, {
+          x: centerX,
+          y: centerY,
+          width: finalWidthPts,
+          height: finalHeightPts,
+        });
+      }
+    } else {
+      // Normal layout handling
+      if (orientation.needsRotation) {
+        page.drawImage(image, {
+          x: x + itemWidthPts,
+          y: y,
+          width: itemHeightPts,
+          height: itemWidthPts,
+          rotate: degrees(90),
+        });
+      } else {
+        page.drawImage(image, {
+          x: x,
+          y: y,
+          width: itemWidthPts,
+          height: itemHeightPts,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error drawing image with orientation:', error);
+    throw error;
   }
 }
 
 // Function to add border for cutting guides
-function shouldAddBorder() {
-  return true; // Always add border for custom layouts
+function shouldAddBorder(layout) {
+  // Don't add borders for oversized items as they may extend beyond sheet
+  return !layout.oversized;
 }
 
 export async function POST(request) {
@@ -166,19 +269,20 @@ export async function POST(request) {
     const autoSheetSize = formData.get('autoSheetSize') === 'true';
     const manualSheetSize = formData.get('sheetSize');
 
-    // Validation
-    if (!frontFiles.length) {
+    // Enhanced validation
+    if (!frontFiles || frontFiles.length === 0) {
       return NextResponse.json({ 
         success: false, 
         error: 'No front images provided' 
       }, { status: 400 });
     }
 
+    // Updated dimension validation for large format support
     if (!itemWidth || !itemHeight || itemWidth < 10 || itemHeight < 10 || 
-        itemWidth > 500 || itemHeight > 500) {
+        itemWidth > 2000 || itemHeight > 2000) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Invalid item dimensions (must be between 10-500mm)' 
+        error: 'Invalid item dimensions (must be between 10-2000mm)' 
       }, { status: 400 });
     }
 
@@ -189,88 +293,121 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    if (doubleSided && backFiles.length === 0) {
+    if (doubleSided && (!backFiles || backFiles.length === 0)) {
       return NextResponse.json({ 
         success: false, 
         error: 'Back images required for double-sided printing' 
       }, { status: 400 });
     }
 
+    // Validate file types and sizes
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'application/pdf'];
+    for (const file of frontFiles) {
+      if (!allowedTypes.includes(file.type)) {
+        return NextResponse.json({ 
+          success: false, 
+          error: `Unsupported file type: ${file.type}. Please use JPEG, PNG, TIFF, or PDF.` 
+        }, { status: 400 });
+      }
+    }
+
     // Determine optimal layout
     let layout, sheetSize, efficiency;
     
-    if (autoSheetSize) {
-      const result = findBestSheetSize(itemWidth, itemHeight, quantity);
-      layout = result.layout;
-      sheetSize = result.sheetSize;
-      efficiency = result.efficiency;
-    } else {
-      if (!manualSheetSize || !SHEET_SIZES[manualSheetSize]) {
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Invalid sheet size' 
-        }, { status: 400 });
+    try {
+      if (autoSheetSize) {
+        const result = findBestSheetSize(itemWidth, itemHeight, quantity);
+        layout = result.layout;
+        sheetSize = result.sheetSize;
+        efficiency = result.efficiency;
+      } else {
+        if (!manualSheetSize || !SHEET_SIZES[manualSheetSize]) {
+          return NextResponse.json({ 
+            success: false, 
+            error: 'Invalid sheet size' 
+          }, { status: 400 });
+        }
+        sheetSize = manualSheetSize;
+        layout = calculateOptimalLayout(itemWidth, itemHeight, sheetSize, quantity);
+        efficiency = layout.oversized ? 0.1 : 
+          (layout.itemsPerSheet * layout.itemWidth * layout.itemHeight) / 
+          (SHEET_SIZES[sheetSize].width * SHEET_SIZES[sheetSize].height);
       }
-      sheetSize = manualSheetSize;
-      layout = calculateOptimalLayout(itemWidth, itemHeight, sheetSize, quantity);
-      efficiency = (layout.itemsPerSheet * layout.itemWidth * layout.itemHeight) / 
-                   (SHEET_SIZES[sheetSize].width * SHEET_SIZES[sheetSize].height);
+    } catch (error) {
+      return NextResponse.json({ 
+        success: false, 
+        error: `Layout calculation failed: ${error.message}` 
+      }, { status: 400 });
     }
 
     const sheet = SHEET_SIZES[sheetSize];
-    const totalItems = layout.totalSheets * layout.itemsPerSheet;
     
-    // Create PDF document
+    // Create PDF document with appropriate settings
     const pdfDoc = await PDFDocument.create();
     
-    // Process front images with orientation detection
-    const processedFrontImages = await Promise.all(
-      frontFiles.map(async (file) => {
+    // Process front images with enhanced error handling
+    const processedFrontImages = [];
+    for (let i = 0; i < frontFiles.length; i++) {
+      try {
+        const file = frontFiles[i];
         const imageBytes = await processImageForPDF(file);
-        try {
-          let embeddedImage;
-          if (file.type === 'image/png') {
-            embeddedImage = await pdfDoc.embedPng(imageBytes);
-          } else {
-            embeddedImage = await pdfDoc.embedJpg(imageBytes);
-          }
-          
-          // Log orientation info for debugging
-          const orientation = getSmartImageDimensions(embeddedImage, itemWidth, itemHeight);
-          console.log(`Image ${file.name}: ${orientation.originalWidth}x${orientation.originalHeight}, rotation: ${orientation.rotation}°`);
-          
-          return embeddedImage;
-        } catch (error) {
-          console.warn(`Failed to embed image ${file.name}, using fallback`);
-          return null;
+        
+        let embeddedImage;
+        if (file.type === 'image/png') {
+          embeddedImage = await pdfDoc.embedPng(imageBytes);
+        } else if (file.type === 'application/pdf') {
+          // For PDF files, we'll need to handle them differently
+          // For now, skip PDF files in this implementation
+          console.warn(`PDF file ${file.name} skipped - not supported in this version`);
+          continue;
+        } else {
+          embeddedImage = await pdfDoc.embedJpg(imageBytes);
         }
-      })
-    );
+        
+        // Log orientation info for debugging
+        const orientation = getSmartImageDimensions(embeddedImage, itemWidth, itemHeight);
+        console.log(`Image ${file.name}: ${orientation.originalWidth}x${orientation.originalHeight}, rotation: ${orientation.rotation}°, oversized: ${layout.oversized}`);
+        
+        processedFrontImages.push(embeddedImage);
+      } catch (error) {
+        console.error(`Failed to process front image ${frontFiles[i].name}:`, error);
+        // Continue with other images rather than failing completely
+      }
+    }
+
+    if (processedFrontImages.length === 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'No images could be processed successfully' 
+      }, { status: 400 });
+    }
 
     // Process back images if double-sided
     let processedBackImages = [];
     if (doubleSided && backFiles.length) {
-      processedBackImages = await Promise.all(
-        backFiles.map(async (file) => {
+      for (let i = 0; i < backFiles.length; i++) {
+        try {
+          const file = backFiles[i];
           const imageBytes = await processImageForPDF(file);
-          try {
-            let embeddedImage;
-            if (file.type === 'image/png') {
-              embeddedImage = await pdfDoc.embedPng(imageBytes);
-            } else {
-              embeddedImage = await pdfDoc.embedJpg(imageBytes);
-            }
-            
-            const orientation = getSmartImageDimensions(embeddedImage, itemWidth, itemHeight);
-            console.log(`Back image ${file.name}: ${orientation.originalWidth}x${orientation.originalHeight}, rotation: ${orientation.rotation}°`);
-            
-            return embeddedImage;
-          } catch (error) {
-            console.warn(`Failed to embed back image ${file.name}`);
-            return null;
+          
+          let embeddedImage;
+          if (file.type === 'image/png') {
+            embeddedImage = await pdfDoc.embedPng(imageBytes);
+          } else if (file.type === 'application/pdf') {
+            console.warn(`PDF file ${file.name} skipped - not supported in this version`);
+            continue;
+          } else {
+            embeddedImage = await pdfDoc.embedJpg(imageBytes);
           }
-        })
-      );
+          
+          const orientation = getSmartImageDimensions(embeddedImage, itemWidth, itemHeight);
+          console.log(`Back image ${file.name}: ${orientation.originalWidth}x${orientation.originalHeight}, rotation: ${orientation.rotation}°`);
+          
+          processedBackImages.push(embeddedImage);
+        } catch (error) {
+          console.error(`Failed to process back image ${backFiles[i].name}:`, error);
+        }
+      }
     }
 
     let itemIndex = 0;
@@ -285,9 +422,14 @@ export async function POST(request) {
           
           const imageIndex = itemIndex % processedFrontImages.length;
           
-          // Calculate position with spacing
-          const x = mmToPoints(layout.margin.horizontal + (col * (layout.itemWidth + layout.itemSpacing)));
-          const y = mmToPoints(sheet.height - layout.margin.vertical - (row * (layout.itemHeight + layout.itemSpacing)) - layout.itemHeight);
+          // Calculate position with spacing (adjusted for oversized items)
+          const x = layout.oversized ? 
+            mmToPoints((sheet.width - itemWidth) / 2) : 
+            mmToPoints(layout.margin.horizontal + (col * (layout.itemWidth + layout.itemSpacing)));
+          
+          const y = layout.oversized ?
+            mmToPoints((sheet.height - itemHeight) / 2) :
+            mmToPoints(sheet.height - layout.margin.vertical - (row * (layout.itemHeight + layout.itemSpacing)) - layout.itemHeight);
           
           const itemWidthPts = mmToPoints(layout.itemWidth);
           const itemHeightPts = mmToPoints(layout.itemHeight);
@@ -295,23 +437,23 @@ export async function POST(request) {
           // Add image with smart orientation
           if (processedFrontImages[imageIndex]) {
             try {
-              drawImageWithOrientation(page, processedFrontImages[imageIndex], x, y, itemWidthPts, itemHeightPts, itemWidth, itemHeight);
+              drawImageWithOrientation(page, processedFrontImages[imageIndex], x, y, itemWidthPts, itemHeightPts, itemWidth, itemHeight, layout);
               
-              // Add cutting border
-              if (shouldAddBorder()) {
+              // Add cutting border (only for non-oversized items)
+              if (shouldAddBorder(layout)) {
                 page.drawRectangle({
                   x: x,
                   y: y,
                   width: itemWidthPts,
                   height: itemHeightPts,
-                  borderColor: rgb(0.8, 0.8, 0.8), // Light gray border
-                  borderWidth: 1, // 1pt border
+                  borderColor: rgb(0.8, 0.8, 0.8),
+                  borderWidth: 1,
                 });
               }
               
             } catch (error) {
               console.warn(`Failed to draw front image ${imageIndex}:`, error);
-              // Draw placeholder
+              // Draw placeholder with error indication
               page.drawRectangle({
                 x: x,
                 y: y,
@@ -322,17 +464,6 @@ export async function POST(request) {
                 borderWidth: 1,
               });
             }
-          } else {
-            // Draw placeholder
-            page.drawRectangle({
-              x: x,
-              y: y,
-              width: itemWidthPts,
-              height: itemHeightPts,
-              color: rgb(0.95, 0.95, 0.95),
-              borderColor: rgb(0.7, 0.7, 0.7),
-              borderWidth: 1,
-            });
           }
           
           itemIndex++;
@@ -353,10 +484,19 @@ export async function POST(request) {
             if (itemIndex >= quantity) break;
             
             const imageIndex = itemIndex % processedBackImages.length;
-            // Mirror column position for back side alignment
-            const mirroredCol = layout.cols - 1 - col;
-            const x = mmToPoints(layout.margin.horizontal + (mirroredCol * (layout.itemWidth + layout.itemSpacing)));
-            const y = mmToPoints(sheet.height - layout.margin.vertical - (row * (layout.itemHeight + layout.itemSpacing)) - layout.itemHeight);
+            
+            // For oversized items, don't mirror - just center
+            const x = layout.oversized ? 
+              mmToPoints((sheet.width - itemWidth) / 2) : 
+              (() => {
+                // Mirror column position for back side alignment
+                const mirroredCol = layout.cols - 1 - col;
+                return mmToPoints(layout.margin.horizontal + (mirroredCol * (layout.itemWidth + layout.itemSpacing)));
+              })();
+            
+            const y = layout.oversized ?
+              mmToPoints((sheet.height - itemHeight) / 2) :
+              mmToPoints(sheet.height - layout.margin.vertical - (row * (layout.itemHeight + layout.itemSpacing)) - layout.itemHeight);
             
             const itemWidthPts = mmToPoints(layout.itemWidth);
             const itemHeightPts = mmToPoints(layout.itemHeight);
@@ -364,10 +504,10 @@ export async function POST(request) {
             // Add back image with smart orientation
             if (processedBackImages[imageIndex]) {
               try {
-                drawImageWithOrientation(page, processedBackImages[imageIndex], x, y, itemWidthPts, itemHeightPts, itemWidth, itemHeight);
+                drawImageWithOrientation(page, processedBackImages[imageIndex], x, y, itemWidthPts, itemHeightPts, itemWidth, itemHeight, layout);
                 
-                // Add cutting border
-                if (shouldAddBorder()) {
+                // Add cutting border (only for non-oversized items)
+                if (shouldAddBorder(layout)) {
                   page.drawRectangle({
                     x: x,
                     y: y,
@@ -390,16 +530,6 @@ export async function POST(request) {
                   borderWidth: 1,
                 });
               }
-            } else {
-              page.drawRectangle({
-                x: x,
-                y: y,
-                width: itemWidthPts,
-                height: itemHeightPts,
-                color: rgb(0.95, 0.95, 0.95),
-                borderColor: rgb(0.7, 0.7, 0.7),
-                borderWidth: 1,
-              });
             }
             
             itemIndex++;
@@ -409,30 +539,53 @@ export async function POST(request) {
       }
     }
 
-    // Generate PDF with 300dpi quality
+    // Generate PDF with optimized settings
     const pdfBytes = await pdfDoc.save({
       useObjectStreams: false,
-      addDefaultPage: false
+      addDefaultPage: false,
+      objectsPerTick: 50, // Optimize for large documents
     });
+    
+    // Generate descriptive filename
+    const sizeInfo = layout.oversized ? 'oversized' : `${layout.cols}x${layout.rows}`;
+    const filename = `custom-layout-${itemWidth}x${itemHeight}mm-${sheetSize}-${sizeInfo}-${layout.totalSheets}sheets${doubleSided ? '-doublesided' : ''}.pdf`;
     
     return new NextResponse(pdfBytes, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="custom-layout-${itemWidth}x${itemHeight}mm-${sheetSize}-${layout.totalSheets}sheets${doubleSided ? '-doublesided' : ''}.pdf"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
         'Content-Length': pdfBytes.length.toString(),
+        'X-Layout-Info': JSON.stringify({
+          itemsPerSheet: layout.itemsPerSheet,
+          totalSheets: layout.totalSheets,
+          efficiency: (efficiency * 100).toFixed(1),
+          oversized: layout.oversized
+        })
       }
     });
 
   } catch (error) {
     console.error('PDF generation error:', error);
     
-    return NextResponse.json({ 
+    // Enhanced error response
+    const errorResponse = {
       success: false,
-      error: 'Failed to generate PDF', 
-      details: error.message || 'Unknown error occurred'
-    }, { 
-      status: 500,
+      error: 'Failed to generate PDF',
+      details: error.message || 'Unknown error occurred',
+      timestamp: new Date().toISOString()
+    };
+    
+    // Different status codes for different error types
+    let statusCode = 500;
+    if (error.message.includes('too large') || error.message.includes('Invalid')) {
+      statusCode = 400;
+    } else if (error.message.includes('memory') || error.message.includes('heap')) {
+      statusCode = 413; // Payload too large
+    }
+    
+    return NextResponse.json(errorResponse, { 
+      status: statusCode,
       headers: {
         'Content-Type': 'application/json',
       }
