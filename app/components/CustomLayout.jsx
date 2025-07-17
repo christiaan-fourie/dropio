@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { FiUpload, FiImage, FiX, FiCheck, FiLoader, FiSettings, FiEye, FiGrid, FiTool } from "react-icons/fi";
+import { FiUpload, FiImage, FiX, FiCheck, FiLoader, FiSettings, FiEye, FiGrid, FiTool, FiZap, FiRotateCw, FiLayers, FiDownload } from "react-icons/fi";
 
 const SHEET_SIZES = {
   A4: { width: 210, height: 297 },
@@ -99,6 +99,7 @@ export default function CustomLayout() {
   const [manualSheetSize, setManualSheetSize] = useState("A4");
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [panelExpanded, setPanelExpanded] = useState(true);
 
   const onDropFront = (acceptedFiles) => {
     setFrontFiles(prev => [...prev, ...acceptedFiles]);
@@ -222,416 +223,613 @@ export default function CustomLayout() {
   const canGenerate = frontFiles.length > 0 && (!doubleSided || backFiles.length > 0) && currentLayout && currentLayout.layout;
 
   return (
-    <div className="p-6">
-
-      {/* Main Content Card */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      <div className="max-w-7xl mx-auto">
         
-        {/* Quick Stats Bar */}
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2">
-                <FiGrid className="w-4 h-4 text-indigo-600" />
-                <span className="font-medium text-gray-700">{itemWidth}×{itemHeight}mm items</span>
+        {/* Header with floating stats */}
+        <div className="relative mb-8">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <FiGrid className="w-6 h-6 text-white" />
               </div>
-              {currentLayout && currentLayout.layout && (
-                <>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="font-medium text-gray-700">{currentLayout.layout.itemsPerSheet} per sheet</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="font-medium text-gray-700">{currentLayout.layout.totalSheets} sheets on {currentLayout.sheetSize}</span>
-                  </div>
-                </>
-              )}
-              {doubleSided && (
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                  <span className="font-medium text-gray-700">Double-sided</span>
-                </div>
-              )}
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                  Custom Size Layout
+                </h1>
+                <p className="text-gray-600 text-sm">Flexible dimensions with smart optimization</p>
+              </div>
             </div>
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className="flex items-center space-x-1 text-indigo-600 hover:text-indigo-700 font-medium"
-            >
-              <FiEye className="w-4 h-4" />
-              <span>{showPreview ? 'Hide' : 'Show'} Preview</span>
-            </button>
           </div>
-        </div>
-
-        <div className="p-6">
-          {/* Settings Panel */}
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 mb-6 border border-gray-200">
-            <div className="flex items-center space-x-2 mb-4">
-              <FiSettings className="w-5 h-5 text-gray-600" />
-              <h3 className="font-medium text-gray-900">Custom Layout Settings</h3>
+          
+          {/* Floating Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg flex items-center justify-center">
+                  <FiGrid className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Item Size</p>
+                  <p className="text-lg font-bold text-gray-900">{itemWidth}×{itemHeight}mm</p>
+                </div>
+              </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Item Dimensions */}
-              <div className="space-y-2">
-                <label className="block text-xs font-medium text-gray-600">Item Dimensions (mm)</label>
-                <div className="flex space-x-2">
-                  <input
-                    type="number"
-                    min={10}
-                    max={500}
-                    value={itemWidth}
-                    onChange={(e) => setItemWidth(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Width"
-                  />
-                  <span className="self-center text-gray-400">×</span>
-                  <input
-                    type="number"
-                    min={10}
-                    max={500}
-                    value={itemHeight}
-                    onChange={(e) => setItemHeight(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Height"
-                  />
-                </div>
-              </div>
-
-              {/* Quantity */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={10000}
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              {/* Sheet Size */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Sheet Size</label>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <input
-                      id="auto-sheet"
-                      type="checkbox"
-                      checked={autoSheetSize}
-                      onChange={(e) => setAutoSheetSize(e.target.checked)}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="auto-sheet" className="ml-2 text-sm text-gray-700">Auto-optimize</label>
-                  </div>
-                  {!autoSheetSize && (
-                    <select
-                      value={manualSheetSize}
-                      onChange={(e) => setManualSheetSize(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="A4">A4 (210×297mm)</option>
-                      <option value="A3">A3 (297×420mm)</option>
-                      <option value="A2">A2 (420×594mm)</option>
-                      <option value="A1">A1 (594×841mm)</option>
-                      <option value="A0">A0 (841×1189mm)</option>
-                    </select>
-                  )}
-                </div>
-              </div>
-
-              {/* Double-sided Toggle */}
-              <div className="flex items-end">
-                <div className="flex items-center h-10">
-                  <input
-                    id="double-sided"
-                    type="checkbox"
-                    checked={doubleSided}
-                    onChange={(e) => setDoubleSided(e.target.checked)}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="double-sided" className="ml-2 text-sm text-gray-700">
-                    Double-sided
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Layout Validation */}
-          {!currentLayout || !currentLayout.layout ? (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <FiTool className="w-5 h-5 text-red-600" />
-                <span className="font-medium text-red-800">Layout Issue</span>
-              </div>
-              <p className="text-sm text-red-700 mt-1">
-                Items ({itemWidth}×{itemHeight}mm) are too large for available sheet sizes. Please reduce the dimensions.
-              </p>
-            </div>
-          ) : (
-            currentLayout.efficiency < 0.15 && (
-              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <FiTool className="w-5 h-5 text-amber-600" />
-                  <span className="font-medium text-amber-800">Layout Warning</span>
-                </div>
-                <p className="text-sm text-amber-700 mt-1">
-                  Low efficiency layout ({(currentLayout.efficiency * 100).toFixed(1)}% sheet usage). Consider adjusting dimensions for better paper utilization.
-                </p>
-              </div>
-            )
-          )}
-
-          {/* Upload Sections */}
-          <div className={`grid ${doubleSided ? 'grid-cols-2' : 'grid-cols-1'} gap-6 mb-6`}>
-            {/* Front Images */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Front Images
-                {frontFiles.length > 0 && (
-                  <span className="ml-2 text-indigo-600 font-normal">({frontFiles.length} files)</span>
-                )}
-              </label>
-              <div
-                {...getFrontRootProps()}
-                className={`border-2 border-dashed rounded-lg p-4 cursor-pointer transition-all duration-200 ${
-                  frontDragActive
-                    ? "border-indigo-500 bg-indigo-50"
-                    : frontFiles.length > 0
-                    ? "border-green-300 bg-green-50"
-                    : "border-gray-300 bg-gray-50 hover:border-indigo-400 hover:bg-indigo-50"
-                }`}
-              >
-                <input {...getFrontInputProps()} />
-                <div className="text-center">
-                  {frontFiles.length === 0 ? (
-                    <>
-                      <FiUpload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-600">Drop files or click to upload</p>
-                      <p className="text-xs text-gray-500 mt-1">PNG, JPEG, TIFF, PDF</p>
-                    </>
-                  ) : (
-                    <>
-                      <FiCheck className="mx-auto h-6 w-6 text-green-500 mb-2" />
-                      <p className="text-sm text-green-700 font-medium">
-                        {frontFiles.length} file{frontFiles.length !== 1 ? 's' : ''} ready
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-              
-              {frontFiles.length > 0 && (
-                <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
-                  {frontFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between bg-white px-2 py-1 rounded border text-xs">
-                      <div className="flex items-center min-w-0 flex-1">
-                        <FiImage className="h-3 w-3 text-indigo-500 mr-2 flex-shrink-0" />
-                        <span className="text-gray-700 truncate">{file.name}</span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeFile(index, 'front');
-                        }}
-                        className="text-red-500 hover:text-red-700 ml-2"
-                      >
-                        <FiX className="h-3 w-3" />
-                      </button>
+            {currentLayout && currentLayout.layout && (
+              <>
+                <div className="bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-500 rounded-lg flex items-center justify-center">
+                      <FiLayers className="w-5 h-5 text-white" />
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Back Images (conditional) */}
-            {doubleSided && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Back Images
-                  {backFiles.length > 0 && (
-                    <span className="ml-2 text-indigo-600 font-normal">({backFiles.length} files)</span>
-                  )}
-                </label>
-                <div
-                  {...getBackRootProps()}
-                  className={`border-2 border-dashed rounded-lg p-4 cursor-pointer transition-all duration-200 ${
-                    backDragActive
-                      ? "border-indigo-500 bg-indigo-50"
-                      : backFiles.length > 0
-                      ? "border-green-300 bg-green-50"
-                      : "border-gray-300 bg-gray-50 hover:border-indigo-400 hover:bg-indigo-50"
-                  }`}
-                >
-                  <input {...getBackInputProps()} />
-                  <div className="text-center">
-                    {backFiles.length === 0 ? (
-                      <>
-                        <FiUpload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-600">Drop files or click to upload</p>
-                        <p className="text-xs text-gray-500 mt-1">Will be mirrored for alignment</p>
-                      </>
-                    ) : (
-                      <>
-                        <FiCheck className="mx-auto h-6 w-6 text-green-500 mb-2" />
-                        <p className="text-sm text-green-700 font-medium">
-                          {backFiles.length} file{backFiles.length !== 1 ? 's' : ''} ready
-                        </p>
-                      </>
-                    )}
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Per Sheet</p>
+                      <p className="text-lg font-bold text-gray-900">{currentLayout.layout.itemsPerSheet} items</p>
+                    </div>
                   </div>
                 </div>
                 
-                {backFiles.length > 0 && (
-                  <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
-                    {backFiles.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between bg-white px-2 py-1 rounded border text-xs">
-                        <div className="flex items-center min-w-0 flex-1">
-                          <FiImage className="h-3 w-3 text-indigo-500 mr-2 flex-shrink-0" />
-                          <span className="text-gray-700 truncate">{file.name}</span>
+                <div className="bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-500 rounded-lg flex items-center justify-center">
+                      <FiRotateCw className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Sheets</p>
+                      <p className="text-lg font-bold text-gray-900">{currentLayout.layout.totalSheets} on {currentLayout.sheetSize}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-500 rounded-lg flex items-center justify-center">
+                      <FiZap className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Efficiency</p>
+                      <p className="text-lg font-bold text-gray-900">{(currentLayout.efficiency * 100).toFixed(1)}%</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Main Panel */}
+        <div className="bg-white/90 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl overflow-hidden">
+          
+          {/* Panel Header */}
+          <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 px-8 py-6 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => setPanelExpanded(!panelExpanded)}
+                  className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/20 rounded-xl flex items-center justify-center hover:bg-white/70 transition-all duration-200"
+                >
+                  <FiSettings className={`w-5 h-5 text-indigo-600 transition-transform duration-300 ${panelExpanded ? 'rotate-90' : ''}`} />
+                </button>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Layout Configuration</h2>
+                  <p className="text-sm text-gray-600">Configure your custom print layout</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                {doubleSided && (
+                  <div className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium flex items-center space-x-1">
+                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
+                    <span>Double-sided</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowPreview(!showPreview)}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${
+                    showPreview 
+                      ? 'bg-indigo-100 text-indigo-700 shadow-md' 
+                      : 'bg-white/50 text-gray-600 hover:bg-white/70'
+                  }`}
+                >
+                  <FiEye className="w-4 h-4" />
+                  <span>{showPreview ? 'Hide' : 'Show'} Preview</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8">
+            {/* Settings Panel */}
+            <div className={`transition-all duration-500 ease-in-out ${panelExpanded ? 'opacity-100 max-h-96 mb-8' : 'opacity-0 max-h-0 overflow-hidden'}`}>
+              <div className="bg-gradient-to-br from-gray-50/50 to-blue-50/30 backdrop-blur-sm rounded-2xl p-6 border border-gray-100">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  
+                  {/* Item Dimensions */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-semibold text-gray-700">Item Dimensions</label>
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={10}
+                          max={500}
+                          value={itemWidth}
+                          onChange={(e) => setItemWidth(Number(e.target.value))}
+                          className="w-full px-4 py-3 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-center font-medium"
+                          placeholder="Width"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 font-medium">mm</span>
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <div className="w-8 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+                        <span className="mx-2 text-gray-400 text-sm">×</span>
+                        <div className="w-8 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={10}
+                          max={500}
+                          value={itemHeight}
+                          onChange={(e) => setItemHeight(Number(e.target.value))}
+                          className="w-full px-4 py-3 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-center font-medium"
+                          placeholder="Height"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 font-medium">mm</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quantity */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-semibold text-gray-700">Quantity</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={1}
+                        max={10000}
+                        value={quantity}
+                        onChange={(e) => setQuantity(Number(e.target.value))}
+                        className="w-full px-4 py-3 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-center font-medium"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 font-medium">items</span>
+                    </div>
+                  </div>
+
+                  {/* Sheet Size */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-semibold text-gray-700">Sheet Size</label>
+                    <div className="space-y-3">
+                      <label className="flex items-center cursor-pointer group">
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={autoSheetSize}
+                            onChange={(e) => setAutoSheetSize(e.target.checked)}
+                            className="sr-only"
+                          />
+                          <div className={`w-11 h-6 rounded-full transition-all duration-200 ${
+                            autoSheetSize ? 'bg-gradient-to-r from-indigo-500 to-purple-500' : 'bg-gray-300'
+                          }`}>
+                            <div className={`w-5 h-5 bg-white rounded-full shadow-lg transform transition-transform duration-200 ${
+                              autoSheetSize ? 'translate-x-5' : 'translate-x-0.5'
+                            } translate-y-0.5`}></div>
+                          </div>
+                        </div>
+                        <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-indigo-600 transition-colors duration-200">Auto-optimize</span>
+                      </label>
+                      
+                      {!autoSheetSize && (
+                        <select
+                          value={manualSheetSize}
+                          onChange={(e) => setManualSheetSize(e.target.value)}
+                          className="w-full px-4 py-3 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 font-medium"
+                        >
+                          <option value="A4">A4 (210×297mm)</option>
+                          <option value="A3">A3 (297×420mm)</option>
+                          <option value="A2">A2 (420×594mm)</option>
+                          <option value="A1">A1 (594×841mm)</option>
+                          <option value="A0">A0 (841×1189mm)</option>
+                        </select>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Double-sided Toggle */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-semibold text-gray-700">Print Mode</label>
+                    <label className="flex items-center cursor-pointer group">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={doubleSided}
+                          onChange={(e) => setDoubleSided(e.target.checked)}
+                          className="sr-only"
+                        />
+                        <div className={`w-11 h-6 rounded-full transition-all duration-200 ${
+                          doubleSided ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 'bg-gray-300'
+                        }`}>
+                          <div className={`w-5 h-5 bg-white rounded-full shadow-lg transform transition-transform duration-200 ${
+                            doubleSided ? 'translate-x-5' : 'translate-x-0.5'
+                          } translate-y-0.5`}></div>
+                        </div>
+                      </div>
+                      <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-green-600 transition-colors duration-200">Double-sided</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Layout Status */}
+            {!currentLayout || !currentLayout.layout ? (
+              <div className="mb-8 p-6 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-2xl">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <FiTool className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-red-800">Layout Issue</h3>
+                    <p className="text-sm text-red-700">
+                      Items ({itemWidth}×{itemHeight}mm) are too large for available sheet sizes. Please reduce the dimensions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              currentLayout.efficiency < 0.15 && (
+                <div className="mb-8 p-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                      <FiZap className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-amber-800">Efficiency Notice</h3>
+                      <p className="text-sm text-amber-700">
+                        Layout efficiency is {(currentLayout.efficiency * 100).toFixed(1)}%. Consider adjusting dimensions for better paper utilization.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            )}
+
+            {/* Upload Sections */}
+            <div className={`grid ${doubleSided ? 'grid-cols-2' : 'grid-cols-1'} gap-8 mb-8`}>
+              {/* Front Images */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">Front Images</h3>
+                  {frontFiles.length > 0 && (
+                    <div className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
+                      {frontFiles.length} file{frontFiles.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+                
+                <div
+                  {...getFrontRootProps()}
+                  className={`relative border-2 border-dashed rounded-2xl p-8 cursor-pointer transition-all duration-300 ${
+                    frontDragActive
+                      ? "border-indigo-400 bg-indigo-50/50 scale-105"
+                      : frontFiles.length > 0
+                      ? "border-green-300 bg-green-50/30"
+                      : "border-gray-300 bg-gray-50/30 hover:border-indigo-300 hover:bg-indigo-50/30"
+                  }`}
+                >
+                  <input {...getFrontInputProps()} />
+                  <div className="text-center">
+                    {frontFiles.length === 0 ? (
+                      <div className="space-y-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center mx-auto">
+                          <FiUpload className="w-8 h-8 text-indigo-600" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-medium text-gray-900">Drop files or click to upload</p>
+                          <p className="text-sm text-gray-600 mt-1">PNG, JPEG, TIFF, PDF • Max 10MB each</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
+                          <FiCheck className="w-8 h-8 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-medium text-green-800">
+                            {frontFiles.length} file{frontFiles.length !== 1 ? 's' : ''} ready
+                          </p>
+                          <p className="text-sm text-green-600 mt-1">Click to add more files</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {frontDragActive && (
+                    <div className="absolute inset-0 bg-indigo-100/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-16 h-16 bg-indigo-200 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce">
+                          <FiUpload className="w-8 h-8 text-indigo-600" />
+                        </div>
+                        <p className="text-lg font-medium text-indigo-800">Drop files here</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {frontFiles.length > 0 && (
+                  <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                    {frontFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between bg-white/80 backdrop-blur-sm px-4 py-3 rounded-xl border border-gray-200 group hover:shadow-md transition-all duration-200">
+                        <div className="flex items-center space-x-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <FiImage className="w-4 h-4 text-indigo-600" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-900 truncate">{file.name}</span>
+                          <span className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(1)}MB</span>
                         </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            removeFile(index, 'back');
+                            removeFile(index, 'front');
                           }}
-                          className="text-red-500 hover:text-red-700 ml-2"
+                          className="w-8 h-8 bg-red-100 hover:bg-red-200 rounded-lg flex items-center justify-center transition-colors duration-200 opacity-0 group-hover:opacity-100"
                         >
-                          <FiX className="h-3 w-3" />
+                          <FiX className="w-4 h-4 text-red-600" />
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Preview Section (collapsible) */}
-          {showPreview && currentLayout && currentLayout.layout && (
-            <div className="border-t border-gray-200 pt-6 mb-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Layout Details */}
+              {/* Back Images (conditional) */}
+              {doubleSided && (
                 <div className="space-y-4">
-                  <h4 className="font-medium text-gray-900">Layout Details</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Grid layout:</span>
-                      <span className="font-medium">{currentLayout.layout.cols} × {currentLayout.layout.rows}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Item size:</span>
-                      <span className="font-medium">{itemWidth}×{itemHeight}mm</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Item spacing:</span>
-                      <span className="font-medium">1mm between items</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Sheet margins:</span>
-                      <span className="font-medium">
-                        {currentLayout.layout.margin?.horizontal?.toFixed(1)}mm × {currentLayout.layout.margin?.vertical?.toFixed(1)}mm
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Efficiency:</span>
-                      <span className="font-medium">{(currentLayout.efficiency * 100).toFixed(1)}%</span>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Back Images</h3>
+                    {backFiles.length > 0 && (
+                      <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                        {backFiles.length} file{backFiles.length !== 1 ? 's' : ''}
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                {/* Visual Preview */}
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-3">Sheet Preview ({currentLayout.sheetSize})</h4>
-                  <div 
-                    className="border-2 border-gray-300 mx-auto bg-white relative shadow-sm rounded"
-                    style={{
-                      width: currentLayout.sheetSize === 'A4' ? '120px' : currentLayout.sheetSize === 'A3' ? '140px' : '160px',
-                      height: currentLayout.sheetSize === 'A4' ? '170px' : currentLayout.sheetSize === 'A3' ? '190px' : '220px',
-                      aspectRatio: `${SHEET_SIZES[currentLayout.sheetSize].width}/${SHEET_SIZES[currentLayout.sheetSize].height}`
-                    }}
+                  
+                  <div
+                    {...getBackRootProps()}
+                    className={`relative border-2 border-dashed rounded-2xl p-8 cursor-pointer transition-all duration-300 ${
+                      backDragActive
+                        ? "border-purple-400 bg-purple-50/50 scale-105"
+                        : backFiles.length > 0
+                        ? "border-green-300 bg-green-50/30"
+                        : "border-gray-300 bg-gray-50/30 hover:border-purple-300 hover:bg-purple-50/30"
+                    }`}
                   >
-                    {/* Items with spacing visualization */}
-                    {Array.from({ length: Math.min(currentLayout.layout.itemsPerSheet, quantity) }).map((_, index) => {
-                      const row = Math.floor(index / currentLayout.layout.cols);
-                      const col = index % currentLayout.layout.cols;
-                      
-                      const leftPercent = ((currentLayout.layout.margin.horizontal + col * (currentLayout.layout.itemWidth + currentLayout.layout.itemSpacing)) / SHEET_SIZES[currentLayout.sheetSize].width) * 100;
-                      const topPercent = ((currentLayout.layout.margin.vertical + row * (currentLayout.layout.itemHeight + currentLayout.layout.itemSpacing)) / SHEET_SIZES[currentLayout.sheetSize].height) * 100;
-                      const widthPercent = (currentLayout.layout.itemWidth / SHEET_SIZES[currentLayout.sheetSize].width) * 100;
-                      const heightPercent = (currentLayout.layout.itemHeight / SHEET_SIZES[currentLayout.sheetSize].height) * 100;
-                      
-                      return (
-                        <div
-                          key={index}
-                          className="absolute bg-indigo-100 border border-indigo-400 rounded-sm"
-                          style={{
-                            left: `${leftPercent}%`,
-                            top: `${topPercent}%`,
-                            width: `${widthPercent}%`,
-                            height: `${heightPercent}%`,
-                          }}
-                        />
-                      );
-                    })}
+                    <input {...getBackInputProps()} />
+                    <div className="text-center">
+                      {backFiles.length === 0 ? (
+                        <div className="space-y-4">
+                          <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center mx-auto">
+                            <FiUpload className="w-8 h-8 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-lg font-medium text-gray-900">Drop back images here</p>
+                            <p className="text-sm text-gray-600 mt-1">Will be mirrored for duplex alignment</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
+                            <FiCheck className="w-8 h-8 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-lg font-medium text-green-800">
+                              {backFiles.length} file{backFiles.length !== 1 ? 's' : ''} ready
+                            </p>
+                            <p className="text-sm text-green-600 mt-1">Click to add more files</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {backDragActive && (
+                      <div className="absolute inset-0 bg-purple-100/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="w-16 h-16 bg-purple-200 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce">
+                            <FiUpload className="w-8 h-8 text-purple-600" />
+                          </div>
+                          <p className="text-lg font-medium text-purple-800">Drop back images here</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    Purple rectangles show item positions with 1mm spacing
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Generate Button */}
-          <div className="border-t border-gray-200 pt-6">
-            <button
-              onClick={handleGeneratePDF}
-              disabled={!canGenerate || isGenerating}
-              className={`w-full px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                canGenerate && !isGenerating
-                  ? "bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 shadow-lg hover:shadow-xl"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }`}
-            >
-              {isGenerating ? (
-                <div className="flex items-center justify-center">
-                  <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                  Generating PDF...
-                </div>
-              ) : (
-                <div className="flex items-center justify-center">
-                  <span>Generate Custom Layout PDF</span>
-                  <span className="ml-2 text-sm opacity-75">(300dpi, CMYK)</span>
+                  
+                  {backFiles.length > 0 && (
+                    <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                      {backFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between bg-white/80 backdrop-blur-sm px-4 py-3 rounded-xl border border-gray-200 group hover:shadow-md transition-all duration-200">
+                          <div className="flex items-center space-x-3 min-w-0 flex-1">
+                            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <FiImage className="w-4 h-4 text-purple-600" />
+                            </div>
+                            <span className="text-sm font-medium text-gray-900 truncate">{file.name}</span>
+                            <span className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(1)}MB</span>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFile(index, 'back');
+                            }}
+                            className="w-8 h-8 bg-red-100 hover:bg-red-200 rounded-lg flex items-center justify-center transition-colors duration-200 opacity-0 group-hover:opacity-100"
+                          >
+                            <FiX className="w-4 h-4 text-red-600" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </button>
-            
-            {!canGenerate && (
-              <p className="mt-2 text-sm text-gray-500 text-center">
-                {frontFiles.length === 0 && "Please upload at least one front image to continue"}
-                {frontFiles.length > 0 && doubleSided && backFiles.length === 0 && "Please upload back images or disable double-sided printing"}
-                {(!currentLayout || !currentLayout.layout) && "Please adjust item dimensions to fit available sheet sizes"}
-              </p>
+            </div>
+
+            {/* Preview Section */}
+            {showPreview && currentLayout && currentLayout.layout && (
+              <div className="mb-8 p-6 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 backdrop-blur-sm rounded-2xl border border-blue-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center space-x-2">
+                  <FiEye className="w-5 h-5 text-indigo-600" />
+                  <span>Layout Preview</span>
+                </h3>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Layout Details */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-900">Configuration Details</h4>
+                    <div className="space-y-3">
+                      {[
+                        { label: 'Grid layout', value: `${currentLayout.layout.cols} × ${currentLayout.layout.rows}` },
+                        { label: 'Item size', value: `${itemWidth}×${itemHeight}mm` },
+                        { label: 'Item spacing', value: '1mm between items' },
+                        { label: 'Sheet margins', value: `${currentLayout.layout.margin?.horizontal?.toFixed(1)}mm × ${currentLayout.layout.margin?.vertical?.toFixed(1)}mm` },
+                        { label: 'Paper efficiency', value: `${(currentLayout.efficiency * 100).toFixed(1)}%` }
+                      ].map((item, index) => (
+                        <div key={index} className="flex justify-between items-center py-2 px-4 bg-white/50 rounded-lg">
+                          <span className="text-sm text-gray-600">{item.label}:</span>
+                          <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Visual Preview */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-900">Sheet Visualization</h4>
+                    <div className="flex flex-col items-center space-y-4">
+                      <div 
+                        className="border-2 border-gray-300 bg-white relative shadow-lg rounded-lg overflow-hidden"
+                        style={{
+                          width: currentLayout.sheetSize === 'A4' ? '140px' : currentLayout.sheetSize === 'A3' ? '160px' : '180px',
+                          height: currentLayout.sheetSize === 'A4' ? '200px' : currentLayout.sheetSize === 'A3' ? '220px' : '240px',
+                          aspectRatio: `${SHEET_SIZES[currentLayout.sheetSize].width}/${SHEET_SIZES[currentLayout.sheetSize].height}`
+                        }}
+                      >
+                        {/* Items with spacing visualization */}
+                        {Array.from({ length: Math.min(currentLayout.layout.itemsPerSheet, quantity) }).map((_, index) => {
+                          const row = Math.floor(index / currentLayout.layout.cols);
+                          const col = index % currentLayout.layout.cols;
+                          
+                          const leftPercent = ((currentLayout.layout.margin.horizontal + col * (currentLayout.layout.itemWidth + currentLayout.layout.itemSpacing)) / SHEET_SIZES[currentLayout.sheetSize].width) * 100;
+                          const topPercent = ((currentLayout.layout.margin.vertical + row * (currentLayout.layout.itemHeight + currentLayout.layout.itemSpacing)) / SHEET_SIZES[currentLayout.sheetSize].height) * 100;
+                          const widthPercent = (currentLayout.layout.itemWidth / SHEET_SIZES[currentLayout.sheetSize].width) * 100;
+                          const heightPercent = (currentLayout.layout.itemHeight / SHEET_SIZES[currentLayout.sheetSize].height) * 100;
+                          
+                          return (
+                            <div
+                              key={index}
+                              className="absolute bg-gradient-to-br from-indigo-100 to-purple-100 border border-indigo-300 rounded-sm shadow-sm hover:shadow-md transition-shadow duration-200"
+                              style={{
+                                left: `${leftPercent}%`,
+                                top: `${topPercent}%`,
+                                width: `${widthPercent}%`,
+                                height: `${heightPercent}%`,
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-900">{currentLayout.sheetSize} Sheet</p>
+                        <p className="text-xs text-gray-600">Items positioned with 1mm spacing</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
+
+            {/* Generate Button */}
+            <div className="text-center">
+              <button
+                onClick={handleGeneratePDF}
+                disabled={!canGenerate || isGenerating}
+                className={`relative px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 ${
+                  canGenerate && !isGenerating
+                    ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                } overflow-hidden`}
+              >
+                {/* Animated background for generating state */}
+                {isGenerating && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 animate-pulse"></div>
+                )}
+                
+                <div className="relative flex items-center justify-center space-x-3">
+                  {isGenerating ? (
+                    <>
+                      <FiLoader className="animate-spin w-6 h-6" />
+                      <span>Generating PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiDownload className="w-6 h-6" />
+                      <span>Generate Custom Layout PDF</span>
+                      <span className="text-sm opacity-75">(300dpi, CMYK)</span>
+                    </>
+                  )}
+                </div>
+              </button>
+              
+              {!canGenerate && !isGenerating && (
+                <div className="mt-4 p-4 bg-amber-50 rounded-xl">
+                  <p className="text-sm text-amber-800 font-medium">
+                    {frontFiles.length === 0 && "Please upload at least one front image to continue"}
+                    {frontFiles.length > 0 && doubleSided && backFiles.length === 0 && "Please upload back images or disable double-sided printing"}
+                    {(!currentLayout || !currentLayout.layout) && "Please adjust item dimensions to fit available sheet sizes"}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Tips Section */}
+        <div className="mt-8 bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-gray-200">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
+              <span className="text-white text-lg">💡</span>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Pro Tips for Custom Layouts</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+            <div className="space-y-2">
+              <p>• <strong>High-resolution images:</strong> Use 300dpi minimum for sharp print quality</p>
+              <p>• <strong>Smart spacing:</strong> 1mm spacing between items ensures easy cutting</p>
+              <p>• <strong>Auto optimization:</strong> Finds the most efficient layout across A4-A0 sheets</p>
+            </div>
+            <div className="space-y-2">
+              <p>• <strong>Double-sided printing:</strong> Back images are automatically mirrored for proper alignment</p>
+              <p>• <strong>Smart orientation:</strong> Portrait images rotate automatically to best fit your dimensions</p>
+              <p>• <strong>Professional output:</strong> 300dpi CMYK PDFs ready for commercial printing</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Tips Section */}
-      <div className="mt-8 bg-gray-50 rounded-lg p-4">
-        <h3 className="font-medium text-gray-900 mb-2">💡 Tips for Custom Layouts</h3>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>• Use high-resolution images (300dpi minimum) for sharp print quality</li>
-          <li>• Items are arranged with 1mm spacing between each for easy cutting</li>
-          <li>• Auto sheet size finds the most efficient layout across A4-A0 sheets</li>
-          <li>• For double-sided printing, back images are automatically mirrored for proper alignment</li>
-          <li>• Portrait images are automatically rotated to best fit your item dimensions</li>
-        </ul>
-      </div>
+      {/* Custom Scrollbar Styles */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(156, 163, 175, 0.5);
+          border-radius: 2px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(156, 163, 175, 0.8);
+        }
+      `}</style>
     </div>
   );
 }
