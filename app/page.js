@@ -79,21 +79,6 @@ export default function Home() {
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2">
                                             <span className="font-medium text-sm">{tool.label}</span>
-                                            {tool.status === 'active' && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                    Active
-                                                </span>
-                                            )}
-                                            {tool.status === 'coming-soon' && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                                                    Soon
-                                                </span>
-                                            )}
-                                            {tool.status === 'planned' && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                                    Planned
-                                                </span>
-                                            )}
                                         </div>
                                         <p className="text-xs text-gray-500 mt-1 leading-relaxed">
                                             {tool.description}
@@ -104,26 +89,9 @@ export default function Home() {
                         })}
                     </div>
 
-                    {/* Tools Info Section */}
-                    <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <h3 className="text-sm font-medium text-blue-900 mb-2">Smart Features</h3>
-                        <ul className="text-xs text-blue-700 space-y-1">
-                            <li>• Auto orientation detection</li>
-                            <li>• 1mm spacing for easy cutting</li>
-                            <li>• Double-sided alignment</li>
-                            <li>• 300dpi print-ready output</li>
-                        </ul>
-                    </div>
-                </nav>
 
-                {/* Footer */}
-                <div className="p-4 border-t border-gray-200">
-                    <div className="text-xs text-gray-500 space-y-1">
-                        <p className="font-medium">Internal Printing Tool</p>
-                        <p>Generate professional print layouts</p>
-                        <p>300dpi • CMYK • Print-ready</p>
-                    </div>
-                </div>
+                </nav>
+                
             </aside>
 
             {/* Main Content Area */}

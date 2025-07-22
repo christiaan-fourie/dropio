@@ -74,10 +74,9 @@ export default function BusinessCards() {
   const [frontFiles, setFrontFiles] = useState([]);
   const [backFiles, setBackFiles] = useState([]);
   const [sheetSize, setSheetSize] = useState("A4");
-  const [sheets, setSheets] = useState(10); // Now represents sheets, not cards
+  const [sheets, setSheets] = useState(1);
   const [doubleSided, setDoubleSided] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
 
   const layout = calculateLayout(sheetSize, sheets * calculateLayout(sheetSize, 1).cardsPerSheet);
   const totalCards = sheets * layout.cardsPerSheet;
@@ -235,27 +234,7 @@ export default function BusinessCards() {
                     </div>
                   </div>
 
-                  {/* Sheets Quantity */}
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
-                      Sheets
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min={1}
-                        max={1000}
-                        value={sheets}
-                        onChange={(e) => setSheets(Number(e.target.value))}
-                        className="w-full px-4 py-3 text-sm font-bold bg-white border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-emerald-300 shadow-sm text-center"
-                      />
-                      <div className="absolute -bottom-6 left-0 right-0 text-center">
-                        <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                          {totalCards} cards total
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  
 
                   {/* Double-sided Toggle */}
                   <div>
@@ -500,17 +479,6 @@ export default function BusinessCards() {
 
       
       
-
-      {/* Tips Section */}
-      <div className="mt-8 bg-gray-50 rounded-lg p-4">
-        <h3 className="font-medium text-gray-900 mb-2">💡 Tips for Best Results</h3>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>• Use high-resolution images (300dpi minimum) for sharp print quality</li>
-          <li>• Business cards are 90×50mm with 1mm spacing between cards for easy cutting</li>
-          <li>• For double-sided printing, back images are automatically mirrored for proper alignment</li>
-          <li>• A4 sheets fit 10 cards, A3 sheets fit 24 cards optimally</li>
-        </ul>
-      </div>
     </div>
   );
 }
