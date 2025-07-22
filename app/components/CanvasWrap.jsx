@@ -1,5 +1,7 @@
+'use client'
+
 import { useState } from "react";
-import { FiImage, FiUpload, FiCheck, FiX, FiSettings } from "react-icons/fi";
+import { FiImage, FiUpload, FiCheck, FiX, FiSettings, FiRotateCw } from "react-icons/fi";
 import jsPDF from 'jspdf';
 
 const CANVAS_PRESETS = [
@@ -13,19 +15,104 @@ const CANVAS_PRESETS = [
 
 export default function CanvasWrap() {
   const [files, setFiles] = useState([]);
+  const [fileOrientations, setFileOrientations] = useState([]); // Track orientations
   const [wrapSize, setWrapSize] = useState("A3");
   const [width, setWidth] = useState(400); // mm, default A3 width
   const [height, setHeight] = useState(300); // mm, default A3 height
   const [thickness, setThickness] = useState(35); // mm, default 3.5cm
   const [extra, setExtra] = useState(5); // mm, default 5mm for each 90° turn
+  const [autoRotate, setAutoRotate] = useState(true); // Auto-rotate toggle
   const [isGenerating, setIsGenerating] = useState(false);
 
-  function handleFileChange(e) {
-    setFiles(Array.from(e.target.files));
+  // Detect image orientation and auto-adjust canvas dimensions
+  function detectImageOrientation(file) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        const isLandscape = img.width > img.height;
+        const aspectRatio = img.width / img.height;
+        
+        // Clean up the object URL
+        URL.revokeObjectURL(url);
+        
+        resolve({
+          isLandscape,
+          aspectRatio,
+          originalWidth: img.width,
+          originalHeight: img.height,
+          needsRotation: false // Will be calculated based on canvas vs image orientation
+        });
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve({
+          isLandscape: true,
+          aspectRatio: 1,
+          originalWidth: 1000,
+          originalHeight: 1000,
+          needsRotation: false
+        });
+      };
+      
+      img.src = url;
+    });
+  }
+
+  // Auto-adjust canvas dimensions based on image orientation
+  function autoAdjustCanvasDimensions(imageOrientation) {
+    const currentCanvasIsLandscape = width > height;
+    const imageIsLandscape = imageOrientation.isLandscape;
+    
+    // If orientations don't match and auto-rotate is enabled
+    if (autoRotate && currentCanvasIsLandscape !== imageIsLandscape) {
+      // Swap canvas dimensions
+      const newWidth = height;
+      const newHeight = width;
+      setWidth(newWidth);
+      setHeight(newHeight);
+      
+      return {
+        rotated: true,
+        newWidth,
+        newHeight,
+        reason: imageIsLandscape ? 'Rotated to landscape for landscape image' : 'Rotated to portrait for portrait image'
+      };
+    }
+    
+    return {
+      rotated: false,
+      reason: 'Canvas orientation matches image'
+    };
+  }
+
+  async function handleFileChange(e) {
+    const newFiles = Array.from(e.target.files);
+    
+    // Process each file to detect orientation
+    const orientations = await Promise.all(
+      newFiles.map(file => detectImageOrientation(file))
+    );
+    
+    // If auto-rotate is enabled and we have files, adjust canvas for the first image
+    if (autoRotate && orientations.length > 0) {
+      const adjustment = autoAdjustCanvasDimensions(orientations[0]);
+      
+      if (adjustment.rotated && newFiles.length === 1) {
+        // Show a brief notification
+        console.log(`Canvas auto-rotated: ${adjustment.reason}`);
+      }
+    }
+    
+    setFiles([...files, ...newFiles]);
+    setFileOrientations([...fileOrientations, ...orientations]);
   }
 
   function removeFile(idx) {
     setFiles(files.filter((_, i) => i !== idx));
+    setFileOrientations(fileOrientations.filter((_, i) => i !== idx));
   }
 
   function handlePresetChange(e) {
@@ -33,6 +120,14 @@ export default function CanvasWrap() {
     setWrapSize(preset.key);
     setWidth(preset.width);
     setHeight(preset.height);
+  }
+
+  // Manual rotation function
+  function rotateCanvas() {
+    const newWidth = height;
+    const newHeight = width;
+    setWidth(newWidth);
+    setHeight(newHeight);
   }
 
   // Calculate print dimensions including bleed
@@ -132,6 +227,7 @@ export default function CanvasWrap() {
   }
 
   const selectedPreset = CANVAS_PRESETS.find(p => p.key === wrapSize);
+  const currentCanvasIsLandscape = width > height;
 
   return (
     <div className="p-8">
@@ -153,6 +249,32 @@ export default function CanvasWrap() {
               <FiSettings className="text-amber-500" />
               <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Canvas Options</span>
             </div>
+            
+            {/* Auto-rotate toggle */}
+            <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={autoRotate}
+                    onChange={(e) => setAutoRotate(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-11 h-6 rounded-full transition-all duration-200 ${
+                    autoRotate ? 'bg-gradient-to-r from-amber-500 to-orange-500' : 'bg-gray-300'
+                  }`}>
+                    <div className={`w-5 h-5 bg-white rounded-full shadow-lg transform transition-transform duration-200 ${
+                      autoRotate ? 'translate-x-5' : 'translate-x-0.5'
+                    } translate-y-0.5`}></div>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-amber-800">Auto-rotate canvas</span>
+                  <p className="text-xs text-amber-600">Automatically adjusts canvas orientation to match uploaded images</p>
+                </div>
+              </label>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-amber-700 mb-1">Width (mm)</label>
@@ -206,6 +328,21 @@ export default function CanvasWrap() {
                 </div>
               </div>
             </div>
+
+            {/* Manual rotation button */}
+            <div className="mt-3 flex items-center space-x-2">
+              <button
+                onClick={rotateCanvas}
+                className="flex items-center space-x-2 px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg transition-colors duration-200 text-sm font-medium"
+              >
+                <FiRotateCw className="w-4 h-4" />
+                <span>Rotate Canvas</span>
+              </button>
+              <div className="text-xs text-amber-600">
+                Current: {currentCanvasIsLandscape ? 'Landscape' : 'Portrait'} ({width}×{height}mm)
+              </div>
+            </div>
+
             <div className="mt-4">
               <label className="block text-xs font-bold text-amber-700 mb-2 uppercase tracking-wide">
                 Canvas Size Preset
@@ -250,6 +387,9 @@ export default function CanvasWrap() {
                 <>
                   <FiUpload className="w-8 h-8 text-amber-400 mb-2" />
                   <p className="text-sm text-amber-700">Drop images or click to upload</p>
+                  {autoRotate && (
+                    <p className="text-xs text-amber-600 mt-1">Canvas will auto-rotate to match image orientation</p>
+                  )}
                 </>
               ) : (
                 <>
@@ -259,16 +399,24 @@ export default function CanvasWrap() {
               )}
             </div>
             {files.length > 0 && (
-              <div className="mt-3 space-y-2 max-h-24 overflow-y-auto">
+              <div className="mt-3 space-y-2 max-h-32 overflow-y-auto">
                 {files.map((file, idx) => (
                   <div key={idx} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-amber-100 shadow-sm">
                     <div className="flex items-center min-w-0 flex-1">
                       <FiImage className="w-4 h-4 text-amber-500 mr-2" />
-                      <span className="text-xs font-medium text-gray-700 truncate">{file.name}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-medium text-gray-700 truncate block">{file.name}</span>
+                        {fileOrientations[idx] && (
+                          <span className="text-xs text-amber-600">
+                            {fileOrientations[idx].isLandscape ? 'Landscape' : 'Portrait'} 
+                            ({fileOrientations[idx].originalWidth}×{fileOrientations[idx].originalHeight})
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <button
                       onClick={() => removeFile(idx)}
-                      className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors duration-200"
+                      className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors duration-200 ml-2 flex-shrink-0"
                     >
                       <FiX className="w-3 h-3" />
                     </button>
@@ -295,11 +443,11 @@ export default function CanvasWrap() {
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
         <h3 className="font-medium text-amber-900 mb-2">💡 Canvas Wrap Tips</h3>
         <ul className="text-sm text-amber-700 space-y-1">
-          <li>• Use high-res images (300dpi) for best print quality</li>
-          <li>• Auto-selects optimal sheet size and orientation</li>
-          <li>• Artwork automatically centered on sheet with proper bleed</li>
-          <li>• Clean export with artwork only - no guide lines</li>
-          <li>• Professional print-ready layout for canvas stretching</li>
+          <li>• <strong>Auto-rotation:</strong> Canvas dimensions automatically match your image orientation</li>
+          <li>• <strong>High-res images:</strong> Use 300dpi for best print quality</li>
+          <li>• <strong>Smart sizing:</strong> Auto-selects optimal sheet size and orientation</li>
+          <li>• <strong>Perfect centering:</strong> Artwork automatically centered with proper bleed</li>
+          <li>• <strong>Clean export:</strong> Professional print-ready layout with artwork only</li>
         </ul>
       </div>
     </div>
