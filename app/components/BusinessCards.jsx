@@ -470,7 +470,7 @@ export default function BusinessCards() {
             ) : (
               <div className="flex items-center justify-center">
                 <FiEye className="mr-2" />
-                Generate PDF
+                Generate PDF: 300dpi & CMYK
               </div>
             )}
           </button>
