@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { FiUpload, FiImage, FiX, FiCheck, FiLoader, FiSettings, FiEye } from "react-icons/fi";
-import { FaToggleOn, FaAddressCard  } from "react-icons/fa6";
+import { FiUpload, FiImage, FiX, FiCheck, FiLoader, FiEye, FiCreditCard } from "react-icons/fi";
+import { FaToggleOn } from "react-icons/fa6";
+import Heading from "@/app/components/Heading";
+import { generateBusinessCardsPDF, downloadPdfBytes } from "@/app/lib/pdf";
 
 const BUSINESS_CARD = {
   width: 90,  // 9cm in mm
@@ -70,7 +72,7 @@ function calculateLayout(sheetSize, cardCount) {
   };
 }
 
-export default function BusinessCards() {
+export default function BusinessCardsPage() {
   const [frontFiles, setFrontFiles] = useState([]);
   const [backFiles, setBackFiles] = useState([]);
   const [sheetSize, setSheetSize] = useState("A4");
@@ -79,7 +81,6 @@ export default function BusinessCards() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const layout = calculateLayout(sheetSize, sheets * calculateLayout(sheetSize, 1).cardsPerSheet);
-  const totalCards = sheets * layout.cardsPerSheet;
 
   // Auto-adjust sheets to fit all uploaded images
   useEffect(() => {
@@ -137,40 +138,15 @@ export default function BusinessCards() {
     }
     setIsGenerating(true);
     try {
-      const formData = new FormData();
-      frontFiles.forEach(file => formData.append('frontFiles', file));
-      if (doubleSided && backFiles.length) {
-        backFiles.forEach(file => formData.append('backFiles', file));
-      }
-      formData.append('sheetSize', sheetSize);
-      formData.append('sheets', sheets.toString());
-      formData.append('doubleSided', doubleSided.toString());
-
-      const response = await fetch('/api/generate-business-cards', {
-        method: 'POST',
-        body: formData,
+      const { pdfBytes, filename } = await generateBusinessCardsPDF({
+        frontFiles,
+        backFiles,
+        sheetSize,
+        sheets,
+        doubleSided,
       });
 
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || errorData.details || 'Failed to generate PDF');
-        } else {
-          const errorText = await response.text();
-          throw new Error(errorText || `HTTP ${response.status}: Failed to generate PDF`);
-        }
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `business-cards-${sheetSize}-${sheets}sheets${doubleSided ? '-doublesided' : ''}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      downloadPdfBytes(pdfBytes, filename);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert(`Failed to generate PDF: ${error.message}`);
@@ -183,6 +159,20 @@ export default function BusinessCards() {
 
   return (
     <div className="p-6">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <Heading
+          icon={FiCreditCard}
+          title="Business Cards"
+          description="Configure sheet size, duplex mode, and upload front and back images."
+        />
+        <div className="flex shrink-0 items-center gap-2 sm:pb-1">
+          <div className={`h-3 w-3 rounded-full ${frontFiles.length > 0 ? "bg-emerald-500" : "bg-gray-300"} animate-pulse`} />
+          <span className="text-xs font-medium text-gray-600">
+            {frontFiles.length > 0 ? "Ready" : "Waiting for files"}
+          </span>
+        </div>
+      </div>
+
       {/* INSANE Streamlined Settings & Upload Row */}
       <div className="relative mb-6 p-6 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl border border-slate-200 shadow-xl">
         {/* Animated Background Elements */}
@@ -191,24 +181,6 @@ export default function BusinessCards() {
         <div className="absolute bottom-4 left-4 w-24 h-24 bg-gradient-to-br from-emerald-200/30 to-cyan-300/30 rounded-full blur-2xl"></div>
         
         <div className="relative z-10">
-          {/* Header with Icon */}
-          <div className="flex items-center mb-6">
-            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg mr-4">
-              <FaAddressCard className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Business Cards</h3>
-              <p className="text-sm text-gray-600"> Configure your business card printing options</p>
-            </div>
-            {/* Status Indicator */}
-            <div className="ml-auto flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${frontFiles.length > 0 ? 'bg-emerald-500' : 'bg-gray-300'} animate-pulse`}></div>
-              <span className="text-xs font-medium text-gray-600">
-                {frontFiles.length > 0 ? 'Ready' : 'Waiting for files'}
-              </span>
-            </div>
-          </div>
-
           {/* Main Configuration Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
             

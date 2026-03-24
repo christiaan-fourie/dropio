@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { FiUpload, FiImage, FiX, FiCheck, FiLoader, FiSettings, FiEye, FiGrid, FiTool, FiZap, FiRotateCw, FiLayers, FiDownload } from "react-icons/fi";
+import Heading from "@/app/components/Heading";
+import { generateCustomLayoutPDF, downloadPdfBytes } from "@/app/lib/pdf";
 
 const SHEET_SIZES = {
   A4: { width: 210, height: 297 },
@@ -88,7 +90,7 @@ function findBestSheetSize(itemWidth, itemHeight, quantity) {
   return null; // Items too large for any sheet
 }
 
-export default function CustomLayout() {
+export default function CustomLayoutPage() {
   const [frontFiles, setFrontFiles] = useState([]);
   const [backFiles, setBackFiles] = useState([]);
   const [itemWidth, setItemWidth] = useState(100);
@@ -170,47 +172,18 @@ export default function CustomLayout() {
     setIsGenerating(true);
     
     try {
-      const formData = new FormData();
-      
-      frontFiles.forEach(file => formData.append('frontFiles', file));
-      if (doubleSided && backFiles.length) {
-        backFiles.forEach(file => formData.append('backFiles', file));
-      }
-      
-      formData.append('itemWidth', itemWidth.toString());
-      formData.append('itemHeight', itemHeight.toString());
-      formData.append('quantity', quantity.toString());
-      formData.append('doubleSided', doubleSided.toString());
-      formData.append('autoSheetSize', autoSheetSize.toString());
-      if (!autoSheetSize) {
-        formData.append('sheetSize', manualSheetSize);
-      }
-
-      const response = await fetch('/api/generate-custom-layout', {
-        method: 'POST',
-        body: formData,
+      const { pdfBytes, filename } = await generateCustomLayoutPDF({
+        frontFiles,
+        backFiles,
+        itemWidth,
+        itemHeight,
+        quantity,
+        doubleSided,
+        autoSheetSize,
+        sheetSize: manualSheetSize,
       });
 
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || errorData.details || 'Failed to generate PDF');
-        } else {
-          const errorText = await response.text();
-          throw new Error(errorText || `HTTP ${response.status}: Failed to generate PDF`);
-        }
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `custom-layout-${itemWidth}x${itemHeight}mm-${currentLayout.sheetSize}-${currentLayout.layout.totalSheets}sheets${doubleSided ? '-doublesided' : ''}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      downloadPdfBytes(pdfBytes, filename);
       
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -226,22 +199,13 @@ export default function CustomLayout() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
       <div className="max-w-7xl mx-auto">
         
-        {/* Header with floating stats */}
         <div className="relative mb-8">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <FiGrid className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                  Custom Size Layout
-                </h1>
-                <p className="text-gray-600 text-sm">Flexible dimensions with smart optimization</p>
-              </div>
-            </div>
-          </div>
-          
+          <Heading
+            icon={FiGrid}
+            title="Custom Size Layout"
+            description="Flexible dimensions with smart sheet optimization."
+          />
+
           {/* Floating Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">

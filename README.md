@@ -30,9 +30,10 @@ You can start editing the main dashboard by modifying `app/page.js`. The page au
 
 ## Project Structure
 
-- `app/components/BusinessCards.jsx` – Business card layout tool
-- `app/components/Sidebar.jsx` – Dashboard navigation
-- `app/api/generate-business-cards/route.js` – PDF generation endpoint
+- `app/page.js` – Home (links to tools)
+- `app/business-cards/page.js`, `app/canvas-wrap/page.js`, `app/custom-layout/page.js` – Tool UIs (client pages)
+- `app/components/Sidebar.jsx` – App navigation
+- `app/lib/pdf/` – Client-side PDF modules (`businessCards`, `customLayout`, `canvasWrap`, `workers`)
 
 ## Print Requirements
 
