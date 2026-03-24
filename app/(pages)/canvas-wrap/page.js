@@ -28,6 +28,12 @@ function SectionTitle({ icon: Icon, id, children }) {
   );
 }
 
+
+
+function getSafeNum(val, fallback = 0) {
+  return val === "" ? fallback : Number(val);
+}
+
 export default function CanvasWrapPage() {
   const [files, setFiles] = useState([]);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -38,9 +44,21 @@ export default function CanvasWrapPage() {
   const [extra, setExtra] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const handleNumberChange = (setter) => (e) => {
+    const val = e.target.value;
+    setter(val === "" ? "" : Number(val));
+  };
+
+  const handleBlur = (value, setter, min, max) => () => {
+    const num = Number(value);
+    if (value === "" || Number.isNaN(num) || num < min) setter(min);
+    else if (num > max) setter(max);
+  };
+
   const hasArtwork = files.length > 0;
 
   useEffect(() => {
+    
     const file = files[0];
     if (!file) {
       setPreviewUrl(null);
@@ -74,17 +92,29 @@ export default function CanvasWrapPage() {
   }
 
   async function generateCanvasPDF() {
-    if (files.length === 0) return;
+    if (files.length === 0 || width === "" || height === "" || thickness === "" || extra === "") {
+      alert("Please ensure all dimensions are filled out before generating.");
+      return;
+    }
+
+    const w = Number(width);
+    const h = Number(height);
+    const t = Number(thickness);
+    const x = Number(extra);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(t) || !Number.isFinite(x)) {
+      alert("Please ensure all dimensions are filled out before generating.");
+      return;
+    }
 
     setIsGenerating(true);
 
     try {
       const { pdfBytes, filename } = await generateCanvasWrapPDF({
         files,
-        width,
-        height,
-        thickness,
-        extra,
+        width: w,
+        height: h,
+        thickness: t,
+        extra: x,
       });
       downloadPdfBytes(pdfBytes, filename);
     } catch (error) {
@@ -96,7 +126,7 @@ export default function CanvasWrapPage() {
   }
 
   const selectedPreset = CANVAS_PRESETS.find((p) => p.key === wrapSize);
-  const currentCanvasIsLandscape = width > height;
+  const currentCanvasIsLandscape = getSafeNum(width, 0) > getSafeNum(height, 0);
 
   const inputClass =
     "w-full rounded-lg border-2 border-amber-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400";
@@ -138,7 +168,7 @@ export default function CanvasWrapPage() {
 
   return (
     <div className="p-8">
-      <Heading
+      {/* <Heading
         icon={FiImage}
         title="Canvas Wrap"
         description={
@@ -146,7 +176,7 @@ export default function CanvasWrapPage() {
             ? "Adjust canvas size and wrap settings — the preview matches your PDF layout."
             : "Upload your artwork first. After that, you can set canvas size, wrap depth, and export."
         }
-      />
+      /> */}
 
       <div className="rounded-2xl border border-amber-200 bg-white/80 p-6 shadow-lg backdrop-blur-sm sm:p-8">
         {!hasArtwork ? (
@@ -161,7 +191,7 @@ export default function CanvasWrapPage() {
             <div className="space-y-10">
               
 
-              <section className="border-t border-amber-100 pt-10" aria-labelledby="canvas-face-heading">
+              <section className="order-amber-100" aria-labelledby="canvas-face-heading">
                 <SectionTitle icon={FiLayers} id="canvas-face-heading">
                   Canvas face size
                 </SectionTitle>
@@ -191,7 +221,8 @@ export default function CanvasWrapPage() {
                       min={100}
                       max={2000}
                       value={width}
-                      onChange={(e) => setWidth(Number(e.target.value))}
+                      onChange={handleNumberChange(setWidth)}
+                      onBlur={handleBlur(width, setWidth, 100, 2000)}
                       className={inputClass}
                     />
                   </div>
@@ -202,7 +233,8 @@ export default function CanvasWrapPage() {
                       min={100}
                       max={2000}
                       value={height}
-                      onChange={(e) => setHeight(Number(e.target.value))}
+                      onChange={handleNumberChange(setHeight)}
+                      onBlur={handleBlur(height, setHeight, 100, 2000)}
                       className={inputClass}
                     />
                   </div>
@@ -219,7 +251,11 @@ export default function CanvasWrapPage() {
                   </button>
                   <span className="text-xs text-amber-700">
                     <span className="font-medium text-amber-900">Now:</span>{" "}
-                    {currentCanvasIsLandscape ? "Landscape" : "Portrait"} ({width}×{height} mm)
+                    {getSafeNum(width, 0) < 1 || getSafeNum(height, 0) < 1
+                      ? "—"
+                      : currentCanvasIsLandscape
+                        ? "landscape"
+                        : "portrait"}
                   </span>
                 </div>
               </section>
@@ -237,10 +273,11 @@ export default function CanvasWrapPage() {
                     <label className="mb-1.5 block text-xs font-semibold text-amber-800">Thickness (mm)</label>
                     <input
                       type="number"
-                      min={10}
+                      min={0}
                       max={100}
                       value={thickness}
-                      onChange={(e) => setThickness(Number(e.target.value))}
+                      onChange={handleNumberChange(setThickness)}
+                      onBlur={handleBlur(thickness, setThickness, 0, 100)}
                       placeholder="35"
                       className={inputClass}
                     />
@@ -253,11 +290,12 @@ export default function CanvasWrapPage() {
                       min={0}
                       max={50}
                       value={extra}
-                      onChange={(e) => setExtra(Number(e.target.value))}
-                      placeholder="5"
+                      onChange={handleNumberChange(setExtra)}
+                      onBlur={handleBlur(extra, setExtra, 0, 50)}
+                      placeholder="1"
                       className={inputClass}
                     />
-                    <p className="mt-1 text-[11px] text-amber-600">Per tight corner when wrapping (default 5 mm)</p>
+                    <p className="mt-1 text-[11px] text-amber-600">Per tight corner when wrapping (default 1 mm)</p>
                   </div>
                 </div>
               </section>
@@ -273,7 +311,25 @@ export default function CanvasWrapPage() {
                 extra={extra}
                 previewUrl={previewUrl}
               />
-              <div className="border-t border-amber-100 pt-8">
+              {/* Reset Button */}
+              <div className="pt-8">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiles([]);
+                    setPreviewUrl(null);
+                    setWrapSize("A3");
+                    setWidth(400);
+                    setHeight(300);
+                    setThickness(35);
+                    setExtra(5);
+                  }}
+                  className="w-full rounded-full py-3.5 text-base font-bold shadow-lg transition focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 bg-amber-100 text-amber-800 hover:bg-amber-200"
+                >
+                  Reset
+                </button>
+              </div>
+              <div className="pt-8">
                 <button
                   type="button"
                   disabled={isGenerating}

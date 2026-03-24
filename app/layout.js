@@ -1,9 +1,17 @@
 import "./globals.css";
-import Sidebar from "./components/Sidebar";
+
+import Header from "./components/Header";
 
 export const metadata = {
-  title: "Printing Store Web Tool",
-  description: "Internal printing layout tool for business cards and canvas wraps",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  title: {
+    default: "Dropio — Print-ready PDF layouts in your browser",
+    template: "%s | Dropio",
+  },
+  description:
+    "Free client-side tools for business card sheets, gallery canvas wraps, and custom print layouts. PDFs are generated locally—your files are not uploaded.",
+  applicationName: "Dropio",
+  robots: { index: true, follow: true },
 };
 
 
@@ -12,9 +20,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className="antialiased">
-        <div className="flex min-h-screen bg-gray-50">
-          <Sidebar />
-          <main className="min-h-screen flex-1 overflow-auto">{children}</main>
+        <div className="flex min-h-screen flex-col bg-gray-50">
+          <Header />
+          <main className="min-h-0 flex-1 overflow-auto">{children}</main>
         </div>
       </body>
     </html>

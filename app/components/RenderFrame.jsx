@@ -5,7 +5,8 @@ import { getCanvasWrapLayoutMm } from "@/app/lib/pdf/canvasSheetLayout";
 
 /**
  * Live preview of canvas-wrap sheet layout (mm-accurate proportions).
- * Matches PDF placement: image fills print block (face + bleed), centered on sheet.
+ * Matches PDF placement: image is stretched to the print block (same as jsPDF addImage),
+ * centered on sheet.
  */
 export default function RenderFrame({
   width,
@@ -50,12 +51,14 @@ export default function RenderFrame({
         <svg viewBox={vb} className="h-full w-full" preserveAspectRatio="xMidYMid meet" aria-label="Sheet layout preview">
           <rect width={L.sheetWidth} height={L.sheetHeight} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth={0.4} />
 
+{/* Clip path to ensure the image is stretched to the print block */}
           <defs>
             <clipPath id={clipId}>
               <rect x={L.printOffsetX} y={L.printOffsetY} width={L.printWidth} height={L.printHeight} />
             </clipPath>
           </defs>
 
+{/* Image is stretched to the print block */}
           <g clipPath={`url(#${clipId})`}>
             {previewUrl ? (
               <image
@@ -64,7 +67,7 @@ export default function RenderFrame({
                 y={L.printOffsetY}
                 width={L.printWidth}
                 height={L.printHeight}
-                preserveAspectRatio="xMidYMid slice"
+                preserveAspectRatio="none"
               />
             ) : (
               <rect
@@ -78,6 +81,15 @@ export default function RenderFrame({
             )}
           </g>
 
+          {/* Lighten wrap/bleed (print block minus face); face stays full strength */}
+          <path
+            fill="#ffffff"
+            fillOpacity={0.55}
+            fillRule="evenodd"
+            d={`M ${L.printOffsetX} ${L.printOffsetY} L ${L.printOffsetX + L.printWidth} ${L.printOffsetY} L ${L.printOffsetX + L.printWidth} ${L.printOffsetY + L.printHeight} L ${L.printOffsetX} ${L.printOffsetY + L.printHeight} Z M ${L.faceOffsetX} ${L.faceOffsetY} L ${L.faceOffsetX + L.faceWidth} ${L.faceOffsetY} L ${L.faceOffsetX + L.faceWidth} ${L.faceOffsetY + L.faceHeight} L ${L.faceOffsetX} ${L.faceOffsetY + L.faceHeight} Z`}
+          />
+
+{/* Print block outline */}
           <rect
             x={L.printOffsetX}
             y={L.printOffsetY}
@@ -88,21 +100,10 @@ export default function RenderFrame({
             strokeWidth={0.35}
             strokeOpacity={0.9}
           />
-
-          <rect
-            x={L.faceOffsetX}
-            y={L.faceOffsetY}
-            width={L.faceWidth}
-            height={L.faceHeight}
-            fill="none"
-            stroke="#0f172a"
-            strokeWidth={0.45}
-            strokeDasharray="2 1.5"
-            strokeOpacity={0.65}
-          />
         </svg>
       </div>
 
+{/* Debug info */}
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-amber-100/80 pt-3 text-[11px] text-amber-950">
         <dt className="text-amber-700/85">Visible face</dt>
         <dd className="font-medium tabular-nums">

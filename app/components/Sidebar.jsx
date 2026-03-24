@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FiCreditCard, FiImage, FiGrid, FiPrinter, FiHome } from "react-icons/fi";
+import { FiCreditCard, FiImage, FiGrid, FiSearch } from "react-icons/fi";
 
 const nav = [
-  { href: "/", label: "Home", icon: FiHome },
   { href: "/business-cards", label: "Business Cards", icon: FiCreditCard },
   { href: "/canvas-wrap", label: "Canvas Wrap", icon: FiImage },
   { href: "/custom-layout", label: "Custom Layout", icon: FiGrid },
+  { href: "/file-inspector", label: "File inspector", icon: FiSearch },
 ];
 
 export default function Sidebar() {
@@ -17,15 +17,7 @@ export default function Sidebar() {
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 p-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-            <FiPrinter className="h-4 w-4 text-white" />
-          </div>
-          <div>
-            <p className="text-lg font-bold text-gray-900">Print Tools</p>
-            <p className="text-xs text-gray-500">Layout system</p>
-          </div>
-        </div>
+        <p className="text-lg font-bold text-gray-900">Tools Box</p>
       </div>
       <nav className="flex-1 space-y-1 p-4">
         {nav.map(({ href, label, icon: Icon }) => {
