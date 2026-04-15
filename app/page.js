@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FiCreditCard, FiGrid, FiImage, FiSearch, FiShield, FiSmile, FiZap } from "react-icons/fi";
+import HexagonalBackground from "@/app/components/HexagonalBackground";
 
 function getSiteUrl() {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
@@ -30,7 +31,7 @@ const TOOLS = [
       "Place standard 90×50mm cards on A4 or A3 with gutters and crop marks. Export a print-ready PDF in one click.",
     icon: FiCreditCard,
     category: "cards",
-    iconClass: "bg-rose-100 text-rose-600",
+    iconClass: "bg-rose-500/15 text-rose-400 ring-1 ring-rose-500/25",
   },
   {
     href: "/canvas-wrap",
@@ -39,7 +40,7 @@ const TOOLS = [
       "Preview gallery-wrap bleed and face size on the correct sheet. Stretch-matched export matches what you see.",
     icon: FiImage,
     category: "canvas",
-    iconClass: "bg-sky-100 text-sky-600",
+    iconClass: "bg-sky-500/15 text-sky-400 ring-1 ring-sky-500/25",
   },
   {
     href: "/custom-layout",
@@ -48,7 +49,7 @@ const TOOLS = [
       "Define item size and quantity; we pick the smallest sheet and pack rows efficiently for production.",
     icon: FiGrid,
     category: "layouts",
-    iconClass: "bg-emerald-100 text-emerald-600",
+    iconClass: "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25",
   },
   {
     href: "/file-inspector",
@@ -57,7 +58,7 @@ const TOOLS = [
       "Upload any PDF or common image to see real format, size, dimensions, and PDF page count—detected locally with magic bytes.",
     icon: FiSearch,
     category: "utilities",
-    iconClass: "bg-violet-100 text-violet-600",
+    iconClass: "bg-violet-500/15 text-violet-400 ring-1 ring-violet-500/25",
   },
 ];
 
@@ -165,32 +166,28 @@ export default async function HomePage({ searchParams }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="relative min-h-screen overflow-hidden bg-[#f7f8fa] pb-24">
-        <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_-8%,rgba(59,130,246,0.08),transparent_55%)]"
-          aria-hidden
-        />
-
-        <div className="relative ">
-          <header className="bg-image bg-cover bg-center mx-auto text-center h-[90vh] flex flex-col justify-center items-center" style={{ backgroundImage: "url('/texture.jpg')" }}>
-            <div className="mx-auto max-w-6xl px-6 sm:px-8">
-              <p className="mb-6 inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+      <div className="relative min-h-screen overflow-hidden bg-zinc-950 pb-24">
+        <div className="relative">
+          <header className="relative mx-auto flex h-[90vh] min-h-[28rem] flex-col items-center justify-center overflow-hidden text-center">
+            <HexagonalBackground />
+            <div className="relative z-10 mx-auto max-w-6xl px-6 sm:px-8">
+              <p className="mb-6 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-sm font-semibold text-zinc-200 ring-1 ring-inset ring-white/15">
                 Free · Private · No account
               </p>
-              <h1 className="text-balance text-4xl font-extrabold tracking-tight text-slate-900 sm:text-6xl">
-                Layouts. Simple, quick, and <span className="text-blue-600">in your browser.</span>
+              <h1 className="text-balance text-4xl font-extrabold tracking-tight text-white sm:text-6xl">
+                Layouts. Simple, quick, and <span className="text-cyan-400">in your browser.</span>
               </h1>
-              <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-slate-600">
+              <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-zinc-400">
                 Generate print-ready PDFs without software. No signup, no account, no hassle.{" "}
-                <strong>Runs on your device</strong> We don't want your artwork
+                <strong className="font-semibold text-zinc-200">Runs on your device</strong> — we don&apos;t want your
+                artwork.
               </p>
             </div>
-            
-          </header>          
+          </header>
 
           <section className="mt-24 mx-auto max-w-6xl px-6 sm:px-8" aria-labelledby="tool-directory-heading">
-            <div className="flex flex-col items-center justify-between gap-4 border-b border-slate-200 pb-8 sm:flex-row">
-              <h2 id="tool-directory-heading" className="text-2xl font-bold text-slate-900">
+            <div className="flex flex-col items-center justify-between gap-4 border-b border-zinc-800 pb-8 sm:flex-row">
+              <h2 id="tool-directory-heading" className="text-2xl font-bold text-zinc-100">
                 Tool directory
               </h2>
               <nav className="flex flex-wrap justify-center gap-2 sm:justify-end" aria-label="Filter tools by category">
@@ -203,8 +200,8 @@ export default async function HomePage({ searchParams }) {
                       scroll={false}
                       className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                         active
-                          ? "bg-slate-900 text-white shadow-md"
-                          : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                          ? "bg-cyan-600 text-white shadow-md shadow-cyan-900/30"
+                          : "bg-zinc-800 text-zinc-300 ring-1 ring-zinc-700 hover:bg-zinc-700"
                       }`}
                     >
                       {label}
@@ -220,16 +217,16 @@ export default async function HomePage({ searchParams }) {
                   <article>
                     <Link
                       href={href}
-                      className="group relative flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 transition-all hover:-translate-y-1 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/5"
+                      className="group relative flex h-full flex-col overflow-hidden rounded-3xl border border-zinc-700/80 bg-zinc-900/70 p-8 transition-all hover:-translate-y-1 hover:border-cyan-500/40 hover:shadow-xl hover:shadow-cyan-900/20"
                     >
                       <div
                         className={`mb-6 flex h-14 w-14 items-center justify-center rounded-2xl ${iconClass} transition-transform group-hover:scale-110`}
                       >
                         <Icon className="h-7 w-7" aria-hidden />
                       </div>
-                      <h3 className="text-xl font-bold text-slate-900">{label}</h3>
-                      <p className="mt-3 flex-1 text-sm leading-relaxed text-slate-500">{description}</p>
-                      <div className="mt-6 flex items-center font-bold text-blue-600">
+                      <h3 className="text-xl font-bold text-zinc-100">{label}</h3>
+                      <p className="mt-3 flex-1 text-sm leading-relaxed text-zinc-400">{description}</p>
+                      <div className="mt-6 flex items-center font-bold text-cyan-400">
                         <span>Launch tool</span>
                         <svg
                           className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1"
@@ -253,33 +250,33 @@ export default async function HomePage({ searchParams }) {
             </ul>
 
             {visibleTools.length === 0 && (
-              <div className="rounded-3xl border-2 border-dashed border-slate-200 py-20 text-center">
-                <p className="text-slate-400">More professional tools coming soon.</p>
+              <div className="rounded-3xl border-2 border-dashed border-zinc-700 py-20 text-center">
+                <p className="text-zinc-500">More professional tools coming soon.</p>
               </div>
             )}
           </section>
 
           <section className="mt-16 grid gap-8 sm:grid-cols-3" aria-label="Why use Dropio">
             <div className="flex flex-col items-center text-center">
-              <div className="mb-4 rounded-full bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                <FiShield className="h-6 w-6 text-blue-500" aria-hidden />
+              <div className="mb-4 rounded-full bg-zinc-800 p-3 shadow-sm ring-1 ring-zinc-700">
+                <FiShield className="h-6 w-6 text-cyan-400" aria-hidden />
               </div>
-              <h2 className="font-bold text-slate-900">Privacy-first</h2>
-              <p className="mt-1 text-sm text-slate-500">Files stay on your machine while PDFs are built locally.</p>
+              <h2 className="font-bold text-zinc-100">Privacy-first</h2>
+              <p className="mt-1 text-sm text-zinc-500">Files stay on your machine while PDFs are built locally.</p>
             </div>
             <div className="flex flex-col items-center text-center">
-              <div className="mb-4 rounded-full bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                <FiZap className="h-6 w-6 text-amber-500" aria-hidden />
+              <div className="mb-4 rounded-full bg-zinc-800 p-3 shadow-sm ring-1 ring-zinc-700">
+                <FiZap className="h-6 w-6 text-amber-400" aria-hidden />
               </div>
-              <h2 className="font-bold text-slate-900">Fast layout</h2>
-              <p className="mt-1 text-sm text-slate-500">No upload queues—tweak dimensions and export when ready.</p>
+              <h2 className="font-bold text-zinc-100">Fast layout</h2>
+              <p className="mt-1 text-sm text-zinc-500">No upload queues—tweak dimensions and export when ready.</p>
             </div>
             <div className="flex flex-col items-center text-center">
-              <div className="mb-4 rounded-full bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                <FiSmile className="h-6 w-6 text-emerald-500" aria-hidden />
+              <div className="mb-4 rounded-full bg-zinc-800 p-3 shadow-sm ring-1 ring-zinc-700">
+                <FiSmile className="h-6 w-6 text-emerald-400" aria-hidden />
               </div>
-              <h2 className="font-bold text-slate-900">No signup</h2>
-              <p className="mt-1 text-sm text-slate-500">Open a tool and start—no subscription or card required.</p>
+              <h2 className="font-bold text-zinc-100">No signup</h2>
+              <p className="mt-1 text-sm text-zinc-500">Open a tool and start—no subscription or card required.</p>
             </div>
           </section>
         </div>

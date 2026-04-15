@@ -15,9 +15,9 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 p-6">
-        <p className="text-lg font-bold text-gray-900">Tools Box</p>
+    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900 shadow-sm shadow-black/20">
+      <div className="border-b border-zinc-800 p-6">
+        <p className="text-lg font-bold text-zinc-100">Tools Box</p>
       </div>
       <nav className="flex-1 space-y-1 p-4">
         {nav.map(({ href, label, icon: Icon }) => {
@@ -31,11 +31,11 @@ export default function Sidebar() {
               href={href}
               className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                 active
-                  ? "border border-blue-200 bg-blue-50 text-blue-700"
-                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                  ? "border border-cyan-500/35 bg-cyan-950/50 text-cyan-300"
+                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
               }`}
             >
-              <Icon className={`h-5 w-5 shrink-0 ${active ? "text-blue-600" : ""}`} />
+              <Icon className={`h-5 w-5 shrink-0 ${active ? "text-cyan-400" : ""}`} />
               {label}
             </Link>
           );
