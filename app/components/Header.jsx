@@ -1,6 +1,15 @@
 import Link from "next/link";
-import { FiShield, FiCoffee, FiZap } from "react-icons/fi";
+import { FiCoffee, FiZap } from "react-icons/fi";
+import { FaGithub } from "react-icons/fa6";
 import HeaderToolsDropdown from "@/app/components/HeaderToolsDropdown";
+
+const DEFAULT_GITHUB_REPO = "https://github.com/christiaan-fourie/dropio";
+
+function githubRepoUrl() {
+  const raw = process.env.NEXT_PUBLIC_GITHUB_REPO_URL?.trim();
+  if (!raw) return DEFAULT_GITHUB_REPO;
+  return raw.replace(/\/$/, "").replace(/\.git$/, "");
+}
 
 const TOOL_LINKS = [
   { href: "/business-cards", label: "Business Cards (For networking, duh)" },
@@ -22,6 +31,8 @@ function dropdownLinkClassName() {
 }
 
 export default function Header() {
+  const githubUrl = githubRepoUrl();
+
   return (
     <header className="sticky top-0 z-50 w-full border-b-2 border-dashed border-amber-200 bg-white/80 backdrop-blur-xl">
       <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-4 sm:px-8">
@@ -59,16 +70,19 @@ export default function Header() {
           />
         </nav>
 
-        {/* The "Trust Me" Badge */}
-        <div className="hidden items-center md:flex">
-          <div className="group flex items-center gap-2 rounded-2xl bg-gray-900 px-4 py-2 text-xs font-bold text-white transition-all hover:bg-emerald-600">
-            <FiShield className="h-4 w-4 animate-pulse text-emerald-400" />
-            <span className="cursor-default">No Servers. Just Vibes (and Privacy).</span>
-          </div>
-        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href={githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-2xl border-2 border-gray-900 bg-white px-3 py-2 text-xs font-bold text-gray-900 shadow-[2px_2px_0px_0px_rgba(17,24,39,1)] transition-all hover:-translate-y-0.5 hover:bg-gray-900 hover:text-white active:translate-y-0 sm:px-4"
+          >
+            <FaGithub className="h-4 w-4 shrink-0" aria-hidden />
+            <span>Contribute</span>
+          </a>
 
-        {/* Mobile Menu: The "I'm on my phone" Button */}
-        <details className="relative md:hidden">
+          {/* Mobile Menu: The "I'm on my phone" Button */}
+          <details className="relative md:hidden">
           <summary className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-xl bg-gray-100 text-gray-900 transition-colors hover:bg-orange-100 marker:hidden">
             <div className="space-y-1">
               <span className="block h-0.5 w-5 bg-current"></span>
@@ -89,6 +103,7 @@ export default function Header() {
              </div>
           </div>
         </details>
+        </div>
       </div>
     </header>
   );
