@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
 import { FiImage, FiUpload, FiCheck, FiX, FiRotateCw, FiLayers, FiPackage, FiInfo } from "react-icons/fi";
 import Heading from "@/app/components/Heading";
 import RenderFrame from "@/app/components/RenderFrame";
@@ -56,6 +57,25 @@ export default function CanvasWrapPage() {
   };
 
   const hasArtwork = files.length > 0;
+
+  const onPreviewDrop = useCallback((acceptedFiles) => {
+    if (acceptedFiles.length > 0) {
+      setFiles([acceptedFiles[0]]);
+    }
+  }, []);
+
+  const {
+    getRootProps: getPreviewRootProps,
+    getInputProps: getPreviewInputProps,
+    isDragActive: isPreviewDragActive,
+  } = useDropzone({
+    accept: {
+      "image/*": [".png", ".jpg", ".jpeg", ".tiff", ".tif"],
+    },
+    noClick: true,
+    disabled: !hasArtwork,
+    onDrop: onPreviewDrop,
+  });
 
   useEffect(() => {
     
@@ -304,13 +324,44 @@ export default function CanvasWrapPage() {
             </div>
 
             <div className="lg:sticky lg:top-6 lg:self-start">
-              <RenderFrame
-                width={width}
-                height={height}
-                thickness={thickness}
-                extra={extra}
-                previewUrl={previewUrl}
-              />
+              <div
+                {...getPreviewRootProps({
+                  className: `group/preview relative rounded-xl outline-none transition-shadow ${
+                    isPreviewDragActive
+                      ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-white"
+                      : "ring-0 ring-offset-0"
+                  }`,
+                })}
+              >
+                <input {...getPreviewInputProps()} aria-label="Drop image to replace preview artwork" />
+                {isPreviewDragActive && (
+                  <div
+                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-amber-50/95 text-center shadow-inner"
+                    aria-hidden
+                  >
+                    <p className="px-4 text-sm font-semibold text-amber-900">Drop to replace image</p>
+                  </div>
+                )}
+                <div className="relative">
+                  <RenderFrame
+                    width={width}
+                    height={height}
+                    thickness={thickness}
+                    extra={extra}
+                    previewUrl={previewUrl}
+                    className={isPreviewDragActive ? "opacity-80" : ""}
+                  />
+                  {!isPreviewDragActive && (
+                    <div
+                      className="pointer-events-none absolute right-2 top-2 z-[1] flex max-w-[min(100%,14rem)] items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[10px] font-medium text-amber-900/80 opacity-0 shadow-sm ring-1 ring-amber-200/60 transition-opacity duration-150 group-hover/preview:opacity-100"
+                      aria-hidden
+                    >
+                      <FiUpload className="h-3 w-3 shrink-0 text-amber-600" strokeWidth={2} />
+                      <span>Drag a new image onto the preview to replace</span>
+                    </div>
+                  )}
+                </div>
+              </div>
               {/* Reset Button */}
               <div className="pt-8">
                 <button
