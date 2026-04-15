@@ -1,6 +1,6 @@
 import { PDFDocument, rgb, degrees } from "pdf-lib";
 import { mmToPoints, processImageForPDF } from "./workers";
-import { SHEETS, pickBestSheetSize, resolveManualSheetLayout } from "./customLayoutMath";
+import { SHEETS, pickBestSheetSize, resolveManualSheetLayout, getPrintableInnerMm } from "./customLayoutMath";
 
 function drawImage(page, image, x, y, itemWidthPts, itemHeightPts, itemWidth, itemHeight, layout) {
   const imageAspectRatio = image.width / image.height;
@@ -9,15 +9,18 @@ function drawImage(page, image, x, y, itemWidthPts, itemHeightPts, itemWidth, it
     Math.abs(1 / imageAspectRatio - itemAspectRatio) < Math.abs(imageAspectRatio - itemAspectRatio);
 
   if (layout.oversized) {
-    const sheetWidthPts = mmToPoints(SHEETS[layout.sheetSize].width);
-    const sheetHeightPts = mmToPoints(SHEETS[layout.sheetSize].height);
-    const maxWidthPts = Math.min(itemWidthPts, sheetWidthPts - mmToPoints(10));
-    const maxHeightPts = Math.min(itemHeightPts, sheetHeightPts - mmToPoints(10));
+    const sheetSpec = SHEETS[layout.sheetSize];
+    const { inset, innerWidth, innerHeight } = getPrintableInnerMm(sheetSpec);
+    const insetPts = mmToPoints(inset);
+    const innerWpts = mmToPoints(innerWidth);
+    const innerHpts = mmToPoints(innerHeight);
+    const maxWidthPts = Math.min(itemWidthPts, innerWpts);
+    const maxHeightPts = Math.min(itemHeightPts, innerHpts);
     const scale = Math.min(maxWidthPts / itemWidthPts, maxHeightPts / itemHeightPts, 1);
     const finalWidthPts = itemWidthPts * scale;
     const finalHeightPts = itemHeightPts * scale;
-    const centerX = (sheetWidthPts - finalWidthPts) / 2;
-    const centerY = (sheetHeightPts - finalHeightPts) / 2;
+    const centerX = insetPts + (innerWpts - finalWidthPts) / 2;
+    const centerY = insetPts + (innerHpts - finalHeightPts) / 2;
 
     if (needsRotation) {
       page.drawImage(image, {
@@ -72,10 +75,10 @@ function drawPlacedPages(
       const colDraw = mirrorCols ? layout.cols - 1 - col : col;
 
       const x = layout.oversized
-        ? mmToPoints((sheet.width - itemWidth) / 2)
+        ? mmToPoints(layout.margin.horizontal)
         : mmToPoints(layout.margin.horizontal + colDraw * (layout.itemWidth + layout.itemSpacing));
       const y = layout.oversized
-        ? mmToPoints((sheet.height - itemHeight) / 2)
+        ? mmToPoints(sheet.height - layout.margin.vertical - itemHeight)
         : mmToPoints(
             sheet.height -
               layout.margin.vertical -
@@ -254,4 +257,13 @@ export async function generateCustomLayoutPDF({
   };
 }
 
-export { SHEETS, computeMaxPackLayout, computeFixedCountLayout, pickBestSheetSize, resolveManualSheetLayout } from "./customLayoutMath";
+export {
+  SHEETS,
+  computeMaxPackLayout,
+  computeFixedCountLayout,
+  pickBestSheetSize,
+  resolveManualSheetLayout,
+  PRINT_SAFE_MARGIN_MM,
+  getPrintableInnerMm,
+  clampedPrintMarginStart,
+} from "./customLayoutMath";
