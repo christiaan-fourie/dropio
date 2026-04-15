@@ -1,5 +1,36 @@
 /** @typedef {'auto' | 'fixed'} SheetLayoutMode */
 
+/** Minimum inset from each sheet edge (mm) for typical office printer non-printable areas. */
+export const PRINT_SAFE_MARGIN_MM = 5;
+
+/**
+ * @param {{ width: number; height: number }} sheet
+ * @returns {{ inset: number; innerWidth: number; innerHeight: number }}
+ */
+export function getPrintableInnerMm(sheet) {
+  const inset = PRINT_SAFE_MARGIN_MM;
+  return {
+    inset,
+    innerWidth: Math.max(0, sheet.width - 2 * inset),
+    innerHeight: Math.max(0, sheet.height - 2 * inset),
+  };
+}
+
+/**
+ * mm offset from sheet edge so content stays within print-safe bounds when it physically fits.
+ * @param {number} sheetDim
+ * @param {number} itemDim
+ * @param {number} [inset]
+ */
+export function clampedPrintMarginStart(sheetDim, itemDim, inset = PRINT_SAFE_MARGIN_MM) {
+  if (itemDim >= sheetDim) return inset;
+  const lo = inset;
+  const hi = sheetDim - itemDim - inset;
+  if (hi < lo) return inset;
+  const centered = (sheetDim - itemDim) / 2;
+  return Math.max(lo, Math.min(hi, centered));
+}
+
 export const SHEETS = {
   A4: { width: 210, height: 297 },
   A3: { width: 297, height: 420 },
@@ -16,16 +47,17 @@ const SHEET_ORDER = ["A4", "A3", "A2", "A1", "A0"];
 export function computeMaxPackLayout(itemWidth, itemHeight, sheetSize, quantity) {
   const sheet = SHEETS[sheetSize];
   const itemSpacing = 1;
+  const { inset, innerWidth, innerHeight } = getPrintableInnerMm(sheet);
 
-  if (itemWidth > sheet.width || itemHeight > sheet.height) {
+  if (itemWidth > innerWidth || itemHeight > innerHeight) {
     return {
       cols: 1,
       rows: 1,
       itemsPerSheet: 1,
       targetItemsPerSheet: 1,
       margin: {
-        horizontal: Math.max(0, (sheet.width - itemWidth) / 2),
-        vertical: Math.max(0, (sheet.height - itemHeight) / 2),
+        horizontal: clampedPrintMarginStart(sheet.width, itemWidth, inset),
+        vertical: clampedPrintMarginStart(sheet.height, itemHeight, inset),
       },
       itemWidth,
       itemHeight,
@@ -38,14 +70,14 @@ export function computeMaxPackLayout(itemWidth, itemHeight, sheetSize, quantity)
 
   let best = null;
   let maxItemsPerSheet = 0;
-  const maxCols = Math.floor((sheet.width + itemSpacing) / (itemWidth + itemSpacing));
-  const maxRows = Math.floor((sheet.height + itemSpacing) / (itemHeight + itemSpacing));
+  const maxCols = Math.floor((innerWidth + itemSpacing) / (itemWidth + itemSpacing));
+  const maxRows = Math.floor((innerHeight + itemSpacing) / (itemHeight + itemSpacing));
 
   for (let cols = 1; cols <= maxCols; cols++) {
     for (let rows = 1; rows <= maxRows; rows++) {
       const totalWidth = cols * itemWidth + (cols - 1) * itemSpacing;
       const totalHeight = rows * itemHeight + (rows - 1) * itemSpacing;
-      if (totalWidth <= sheet.width && totalHeight <= sheet.height) {
+      if (totalWidth <= innerWidth && totalHeight <= innerHeight) {
         const itemsPerSheet = cols * rows;
         if (itemsPerSheet > maxItemsPerSheet) {
           maxItemsPerSheet = itemsPerSheet;
@@ -54,8 +86,8 @@ export function computeMaxPackLayout(itemWidth, itemHeight, sheetSize, quantity)
             rows,
             itemsPerSheet,
             margin: {
-              horizontal: (sheet.width - totalWidth) / 2,
-              vertical: (sheet.height - totalHeight) / 2,
+              horizontal: inset + (innerWidth - totalWidth) / 2,
+              vertical: inset + (innerHeight - totalHeight) / 2,
             },
           };
         }
@@ -70,8 +102,8 @@ export function computeMaxPackLayout(itemWidth, itemHeight, sheetSize, quantity)
       itemsPerSheet: 1,
       targetItemsPerSheet: 1,
       margin: {
-        horizontal: Math.max(0, (sheet.width - itemWidth) / 2),
-        vertical: Math.max(0, (sheet.height - itemHeight) / 2),
+        horizontal: clampedPrintMarginStart(sheet.width, itemWidth, inset),
+        vertical: clampedPrintMarginStart(sheet.height, itemHeight, inset),
       },
       itemWidth,
       itemHeight,
@@ -100,18 +132,19 @@ export function computeMaxPackLayout(itemWidth, itemHeight, sheetSize, quantity)
 export function computeFixedCountLayout(itemWidth, itemHeight, sheetSize, itemsPerPage, quantity) {
   const sheet = SHEETS[sheetSize];
   const itemSpacing = 1;
+  const { inset, innerWidth, innerHeight } = getPrintableInnerMm(sheet);
 
   if (!itemsPerPage || itemsPerPage < 1) return null;
 
-  if (itemWidth > sheet.width || itemHeight > sheet.height) {
+  if (itemWidth > innerWidth || itemHeight > innerHeight) {
     return {
       cols: 1,
       rows: 1,
       itemsPerSheet: 1,
       targetItemsPerSheet: 1,
       margin: {
-        horizontal: Math.max(0, (sheet.width - itemWidth) / 2),
-        vertical: Math.max(0, (sheet.height - itemHeight) / 2),
+        horizontal: clampedPrintMarginStart(sheet.width, itemWidth, inset),
+        vertical: clampedPrintMarginStart(sheet.height, itemHeight, inset),
       },
       itemWidth,
       itemHeight,
@@ -129,7 +162,7 @@ export function computeFixedCountLayout(itemWidth, itemHeight, sheetSize, itemsP
     const rows = Math.ceil(itemsPerPage / cols);
     const totalWidth = cols * itemWidth + (cols - 1) * itemSpacing;
     const totalHeight = rows * itemHeight + (rows - 1) * itemSpacing;
-    if (totalWidth > sheet.width || totalHeight > sheet.height) continue;
+    if (totalWidth > innerWidth || totalHeight > innerHeight) continue;
     const slots = cols * rows;
     if (slots < itemsPerPage) continue;
     const waste = slots - itemsPerPage;
@@ -148,8 +181,8 @@ export function computeFixedCountLayout(itemWidth, itemHeight, sheetSize, itemsP
     itemsPerSheet: itemsPerPage,
     targetItemsPerSheet: itemsPerPage,
     margin: {
-      horizontal: (sheet.width - best.totalWidth) / 2,
-      vertical: (sheet.height - best.totalHeight) / 2,
+      horizontal: inset + (innerWidth - best.totalWidth) / 2,
+      vertical: inset + (innerHeight - best.totalHeight) / 2,
     },
     itemWidth,
     itemHeight,
@@ -230,6 +263,7 @@ function floor2(x) {
  */
 export function computeBestItemSizeForItemsPerPage(sheetSize, itemsPerPage, aspectWOverH) {
   const sheet = SHEETS[sheetSize];
+  const { innerWidth, innerHeight } = getPrintableInnerMm(sheet);
   const spacing = 1;
   const r = Math.max(0.05, Math.min(20, Number(aspectWOverH) || 1));
   let best = null;
@@ -241,15 +275,15 @@ export function computeBestItemSizeForItemsPerPage(sheetSize, itemsPerPage, aspe
     const slots = cols * rows;
     if (slots < itemsPerPage) continue;
 
-    const hFromW = (sheet.width - (cols - 1) * spacing) / (cols * r);
-    const hFromH = (sheet.height - (rows - 1) * spacing) / rows;
+    const hFromW = (innerWidth - (cols - 1) * spacing) / (cols * r);
+    const hFromH = (innerHeight - (rows - 1) * spacing) / rows;
     const h = Math.min(hFromW, hFromH);
     if (h < 10) continue;
     const w = r * h;
     if (w < 10) continue;
     const totalW = cols * w + (cols - 1) * spacing;
     const totalH = rows * h + (rows - 1) * spacing;
-    if (totalW > sheet.width + 1e-6 || totalH > sheet.height + 1e-6) continue;
+    if (totalW > innerWidth + 1e-6 || totalH > innerHeight + 1e-6) continue;
 
     const area = w * h;
     const waste = slots - itemsPerPage;
@@ -284,6 +318,7 @@ export function solvePerSheetItemLayout({ itemsPerPage, aspectWOverH, autoSheetS
 export function buildFixedLayoutFromGrid(sheetSize, cols, rows, itemWidth, itemHeight, targetItemsPerPage, quantity) {
   const sheet = SHEETS[sheetSize];
   const itemSpacing = 1;
+  const { inset, innerWidth, innerHeight } = getPrintableInnerMm(sheet);
   const totalW = cols * itemWidth + (cols - 1) * itemSpacing;
   const totalH = rows * itemHeight + (rows - 1) * itemSpacing;
   return {
@@ -292,8 +327,8 @@ export function buildFixedLayoutFromGrid(sheetSize, cols, rows, itemWidth, itemH
     targetItemsPerSheet: targetItemsPerPage,
     itemsPerSheet: targetItemsPerPage,
     margin: {
-      horizontal: (sheet.width - totalW) / 2,
-      vertical: (sheet.height - totalH) / 2,
+      horizontal: inset + (innerWidth - totalW) / 2,
+      vertical: inset + (innerHeight - totalH) / 2,
     },
     itemWidth,
     itemHeight,

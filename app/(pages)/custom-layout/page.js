@@ -12,6 +12,7 @@ import {
   solvePerSheetItemLayout,
   buildFixedLayoutFromGrid,
   estimateLayoutEfficiency,
+  PRINT_SAFE_MARGIN_MM,
 } from "@/app/lib/pdf/customLayoutMath";
 
 const inputClass =
@@ -520,6 +521,27 @@ export default function CustomLayoutPage() {
                         aspectRatio: `${SHEETS[currentLayout.sheetSize].width}/${SHEETS[currentLayout.sheetSize].height}`,
                       }}
                     >
+                      {(() => {
+                        const sw = SHEETS[currentLayout.sheetSize].width;
+                        const sh = SHEETS[currentLayout.sheetSize].height;
+                        const m = PRINT_SAFE_MARGIN_MM;
+                        const safeLeftPct = (m / sw) * 100;
+                        const safeTopPct = (m / sh) * 100;
+                        const safeWPct = (Math.max(0, sw - 2 * m) / sw) * 100;
+                        const safeHPct = (Math.max(0, sh - 2 * m) / sh) * 100;
+                        return (
+                          <div
+                            className="pointer-events-none absolute z-0 box-border border border-dashed border-amber-600/70 bg-amber-400/10"
+                            style={{
+                              left: `${safeLeftPct}%`,
+                              top: `${safeTopPct}%`,
+                              width: `${safeWPct}%`,
+                              height: `${safeHPct}%`,
+                            }}
+                            aria-hidden
+                          />
+                        );
+                      })()}
                       {Array.from({
                         length: Math.min(currentLayout.layout.targetItemsPerSheet, quantity),
                       }).map((_, index) => {
@@ -535,7 +557,7 @@ export default function CustomLayoutPage() {
                         return (
                           <div
                             key={index}
-                            className="absolute border border-gray-400 bg-gray-100"
+                            className="absolute z-[1] border border-gray-400 bg-gray-100"
                             style={{
                               left: `${leftPct}%`,
                               top: `${topPct}%`,
@@ -546,6 +568,10 @@ export default function CustomLayoutPage() {
                         );
                       })}
                     </div>
+                    <p className="mt-2 text-xs text-gray-600">
+                      Amber dashed box: print-safe zone (minimum {PRINT_SAFE_MARGIN_MM} mm from each sheet edge). PDF
+                      matches this preview.
+                    </p>
                   </div>
                 </>
               ) : (
@@ -580,7 +606,10 @@ export default function CustomLayoutPage() {
           )}
         </div>
 
-        <p className="mt-6 text-center text-xs text-gray-400">1 mm gap between items · Single-sided · In your browser</p>
+        <p className="mt-6 text-center text-xs text-gray-400">
+          1 mm gap between items · {PRINT_SAFE_MARGIN_MM} mm minimum sheet margins for printing · Single-sided · In your
+          browser
+        </p>
       </div>
     </div>
   );
