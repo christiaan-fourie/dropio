@@ -16,12 +16,12 @@ import {
 } from "@/app/lib/pdf/customLayoutMath";
 
 const inputClass =
-  "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900";
+  "w-full rounded-lg border border-zinc-600 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400";
 
 const btnPrimary =
-  "flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300";
+  "flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400";
 const btnSecondary =
-  "flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50";
+  "flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-3 text-sm font-medium text-zinc-200 hover:bg-zinc-700";
 
 function StepIndicator({ step }) {
   const items = [
@@ -33,17 +33,17 @@ function StepIndicator({ step }) {
     <nav className="mb-8 flex items-center justify-center gap-0 sm:gap-2" aria-label="Steps">
       {items.map((s, i) => (
         <div key={s.n} className="flex items-center">
-          {i > 0 && <div className="mx-1 hidden h-px w-6 bg-gray-300 sm:mx-2 sm:block sm:w-10" />}
+          {i > 0 && <div className="mx-1 hidden h-px w-6 bg-zinc-700 sm:mx-2 sm:block sm:w-10" />}
           <div className="flex flex-col items-center gap-1">
             <span
               className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${
-                step === s.n ? "bg-gray-900 text-white" : step > s.n ? "bg-gray-200 text-gray-700" : "bg-gray-100 text-gray-400"
+                step === s.n ? "bg-zinc-100 text-zinc-950" : step > s.n ? "bg-zinc-600 text-zinc-200" : "bg-zinc-800 text-zinc-500"
               }`}
             >
               {s.n}
             </span>
             <span
-              className={`text-[10px] font-medium uppercase tracking-wide sm:text-xs ${step === s.n ? "text-gray-900" : "text-gray-400"}`}
+              className={`text-[10px] font-medium uppercase tracking-wide sm:text-xs ${step === s.n ? "text-zinc-100" : "text-zinc-500"}`}
             >
               {s.label}
             </span>
@@ -235,45 +235,58 @@ export default function CustomLayoutPage() {
 
   const dropClass =
     `cursor-pointer rounded-lg border-2 border-dashed px-4 py-10 text-center text-sm transition-colors ${
-      isDragActive ? "border-gray-900 bg-gray-50" : files.length > 0 ? "border-gray-400 bg-gray-50/80" : "border-gray-300 bg-white hover:border-gray-500"
+      isDragActive ? "border-zinc-300 bg-zinc-800" : files.length > 0 ? "border-zinc-500 bg-zinc-800/80" : "border-zinc-600 bg-zinc-900 hover:border-zinc-500"
     }`;
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-10 sm:px-6">
-      <div className="mx-auto max-w-xl">
+    <div className="p-6 text-zinc-100">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <Heading
           icon={FiGrid}
           title="Custom layout"
           description="Upload files, then either set sizes yourself or pick how many fit on each page—we’ll work out the dimensions."
         />
+        <div className="flex shrink-0 items-center gap-2 sm:pb-1">
+          <div
+            className={`h-3 w-3 rounded-full ${files.length > 0 ? "animate-pulse bg-emerald-500" : "bg-zinc-600"}`}
+          />
+          <span className="text-xs font-medium text-zinc-400">
+            Step {step} of 3
+            {files.length > 0 ? ` · ${files.length} file${files.length !== 1 ? "s" : ""}` : ""}
+          </span>
+        </div>
+      </div>
 
+      <div className="mx-auto max-w-5xl">
         <StepIndicator step={step} />
 
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl border border-zinc-700 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 shadow-xl shadow-black/30">
+          <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/5 to-indigo-500/5" aria-hidden />
+          <div className="relative z-10">
           {step === 1 && (
             <div className="space-y-5 p-6">
-              <h2 className="text-sm font-semibold text-gray-900">Step 1 — Upload</h2>
-              <p className="text-sm text-gray-600">
+              <h2 className="text-sm font-semibold text-zinc-100">Step 1 — Upload</h2>
+              <p className="text-sm text-zinc-400">
                 One file = repeated everywhere. Several files = used in order, looping. We use the first image’s shape
                 when calculating sizes from “per sheet”.
               </p>
               <div {...getRootProps()} className={dropClass}>
                 <input {...getInputProps()} />
-                <FiUpload className="mx-auto mb-2 h-7 w-7 text-gray-400" />
-                <p className="font-medium text-gray-800">Drop images or PDFs here, or click to browse</p>
-                <p className="mt-1 text-xs text-gray-500">PNG, JPG, TIFF, PDF</p>
+                <FiUpload className="mx-auto mb-2 h-7 w-7 text-zinc-500" />
+                <p className="font-medium text-zinc-200">Drop images or PDFs here, or click to browse</p>
+                <p className="mt-1 text-xs text-zinc-500">PNG, JPG, TIFF, PDF</p>
               </div>
               {files.length > 0 && (
                 <>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-medium text-gray-900">{files.length}</span> file{files.length !== 1 ? "s" : ""}{" "}
+                  <p className="text-sm text-zinc-300">
+                    <span className="font-medium text-zinc-100">{files.length}</span> file{files.length !== 1 ? "s" : ""}{" "}
                     — {files.length === 1 ? <span>same image every cell</span> : <span>cycle in upload order</span>}
                   </p>
-                  <ul className="max-h-36 space-y-1 overflow-y-auto text-xs text-gray-600">
+                  <ul className="max-h-36 space-y-1 overflow-y-auto text-xs text-zinc-400">
                     {files.map((file, index) => (
-                      <li key={index} className="flex items-center justify-between gap-2 rounded-md bg-gray-50 px-2 py-1.5">
+                      <li key={index} className="flex items-center justify-between gap-2 rounded-md bg-zinc-800/50 px-2 py-1.5">
                         <span className="flex min-w-0 items-center gap-2 truncate">
-                          <FiImage className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                          <FiImage className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
                           {file.name}
                         </span>
                         <button
@@ -282,7 +295,7 @@ export default function CustomLayoutPage() {
                             e.stopPropagation();
                             removeFile(index);
                           }}
-                          className="shrink-0 text-gray-400 hover:text-red-600"
+                          className="shrink-0 text-zinc-500 hover:text-red-600"
                           aria-label="Remove"
                         >
                           <FiX className="h-4 w-4" />
@@ -301,11 +314,11 @@ export default function CustomLayoutPage() {
 
           {step === 2 && (
             <div className="space-y-5 p-6">
-              <h2 className="text-sm font-semibold text-gray-900">Step 2 — How to lay out</h2>
-              <p className="text-sm text-gray-600">Choose one approach, set total copies, then paper size.</p>
+              <h2 className="text-sm font-semibold text-zinc-100">Step 2 — How to lay out</h2>
+              <p className="text-sm text-zinc-400">Choose one approach, set total copies, then paper size.</p>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Total copies</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Total copies</label>
                 <input
                   type="number"
                   min={1}
@@ -316,26 +329,26 @@ export default function CustomLayoutPage() {
                 />
               </div>
 
-              <div className="space-y-3 rounded-lg border border-gray-200 p-4">
+              <div className="space-y-3 rounded-lg border border-zinc-700 p-4">
                 <label className="flex cursor-pointer items-start gap-3 text-sm">
                   <input
                     type="radio"
                     name="step2Mode"
                     checked={step2Mode === "dimensions"}
                     onChange={() => setStep2Mode("dimensions")}
-                    className="mt-0.5 text-gray-900"
+                    className="mt-0.5 text-zinc-100"
                   />
                   <span>
-                    <span className="font-medium text-gray-900">I know width &amp; height (mm)</span>
-                    <span className="mt-1 block text-xs text-gray-500">Each print is exactly this size on the page.</span>
+                    <span className="font-medium text-zinc-100">I know width &amp; height (mm)</span>
+                    <span className="mt-1 block text-xs text-zinc-500">Each print is exactly this size on the page.</span>
                   </span>
                 </label>
 
                 {step2Mode === "dimensions" && (
-                  <div className="ml-7 space-y-4 border-l border-gray-100 pl-4">
+                  <div className="ml-7 space-y-4 border-l border-zinc-700 pl-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="mb-1 block text-xs text-gray-600">Width (mm)</label>
+                        <label className="mb-1 block text-xs text-zinc-400">Width (mm)</label>
                         <input
                           type="number"
                           min={10}
@@ -346,7 +359,7 @@ export default function CustomLayoutPage() {
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs text-gray-600">Height (mm)</label>
+                        <label className="mb-1 block text-xs text-zinc-400">Height (mm)</label>
                         <input
                           type="number"
                           min={10}
@@ -358,14 +371,14 @@ export default function CustomLayoutPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-xs font-medium text-gray-600">On each sheet</p>
+                      <p className="text-xs font-medium text-zinc-400">On each sheet</p>
                       <label className="flex cursor-pointer items-center gap-2 text-sm">
                         <input
                           type="radio"
                           name="packing"
                           checked={packingMode === "auto"}
                           onChange={() => setPackingMode("auto")}
-                          className="text-gray-900"
+                          className="text-zinc-100"
                         />
                         Fit as many as fit
                       </label>
@@ -375,7 +388,7 @@ export default function CustomLayoutPage() {
                           name="packing"
                           checked={packingMode === "fixed"}
                           onChange={() => setPackingMode("fixed")}
-                          className="text-gray-900"
+                          className="text-zinc-100"
                         />
                         <span className="flex flex-wrap items-center gap-2">
                           Exactly
@@ -401,17 +414,17 @@ export default function CustomLayoutPage() {
                     name="step2Mode"
                     checked={step2Mode === "perSheet"}
                     onChange={() => setStep2Mode("perSheet")}
-                    className="mt-0.5 text-gray-900"
+                    className="mt-0.5 text-zinc-100"
                   />
                   <span className="flex-1">
-                    <span className="font-medium text-gray-900">I know how many per page</span>
-                    <span className="mt-1 block text-xs text-gray-500">
+                    <span className="font-medium text-zinc-100">I know how many per page</span>
+                    <span className="mt-1 block text-xs text-zinc-500">
                       We pick width × height to fit that count, keeping your first image’s aspect ratio (or square for
                       PDF).
                     </span>
                     {step2Mode === "perSheet" && (
                       <div className="mt-3">
-                        <label className="mb-1 block text-xs text-gray-600">Copies per sheet</label>
+                        <label className="mb-1 block text-xs text-zinc-400">Copies per sheet</label>
                         <input
                           type="number"
                           min={1}
@@ -432,7 +445,7 @@ export default function CustomLayoutPage() {
                     type="checkbox"
                     checked={autoSheetSize}
                     onChange={(e) => setAutoSheetSize(e.target.checked)}
-                    className="rounded border-gray-300 text-gray-900"
+                    className="rounded border-zinc-600 text-zinc-100"
                   />
                   Pick smallest paper that works (A4 → A0)
                 </label>
@@ -452,9 +465,9 @@ export default function CustomLayoutPage() {
               </div>
 
               {step2Mode === "perSheet" && perSheetSolve && (
-                <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                <p className="rounded-lg bg-zinc-800/50 px-3 py-2 text-sm text-zinc-300">
                   Computed item size:{" "}
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-zinc-100">
                     {perSheetSolve.itemWidth}×{perSheetSolve.itemHeight} mm
                   </span>
                   {" · "}
@@ -463,7 +476,7 @@ export default function CustomLayoutPage() {
               )}
 
               {!currentLayout?.layout && (
-                <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                <div className="flex gap-2 rounded-lg border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-200">
                   <FiTool className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>
                     {step2Mode === "perSheet"
@@ -490,15 +503,15 @@ export default function CustomLayoutPage() {
 
           {step === 3 && (
             <div className="space-y-5 p-6">
-              <h2 className="text-sm font-semibold text-gray-900">Step 3 — Preview &amp; download</h2>
+              <h2 className="text-sm font-semibold text-zinc-100">Step 3 — Preview &amp; download</h2>
 
               {currentLayout?.layout ? (
                 <>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-medium text-gray-900">{currentLayout.sheetSize}</span>
+                  <p className="text-sm text-zinc-300">
+                    <span className="font-medium text-zinc-100">{currentLayout.sheetSize}</span>
                     {" · "}
                     Each item{" "}
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-zinc-100">
                       {currentLayout.layout.itemWidth}×{currentLayout.layout.itemHeight} mm
                     </span>
                     {" · "}
@@ -510,13 +523,13 @@ export default function CustomLayoutPage() {
                     ~{Math.round(currentLayout.efficiency * 100)}% paper
                   </p>
                   {currentLayout.efficiency < 0.15 && (
-                    <p className="text-xs text-amber-800">Low sheet usage — consider a smaller paper if you can.</p>
+                    <p className="text-xs text-amber-300/90">Low sheet usage — consider a smaller paper if you can.</p>
                   )}
 
                   <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Sheet preview</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Sheet preview</p>
                     <div
-                      className="relative mx-auto max-w-[220px] border border-gray-300 bg-white"
+                      className="relative mx-auto max-w-[220px] border border-zinc-600 bg-zinc-950"
                       style={{
                         aspectRatio: `${SHEETS[currentLayout.sheetSize].width}/${SHEETS[currentLayout.sheetSize].height}`,
                       }}
@@ -557,7 +570,7 @@ export default function CustomLayoutPage() {
                         return (
                           <div
                             key={index}
-                            className="absolute z-[1] border border-gray-400 bg-gray-100"
+                            className="absolute z-[1] border border-zinc-500 bg-zinc-800"
                             style={{
                               left: `${leftPct}%`,
                               top: `${topPct}%`,
@@ -568,14 +581,14 @@ export default function CustomLayoutPage() {
                         );
                       })}
                     </div>
-                    <p className="mt-2 text-xs text-gray-600">
-                      Amber dashed box: print-safe zone (minimum {PRINT_SAFE_MARGIN_MM} mm from each sheet edge). PDF
+                    <p className="mt-2 text-xs text-zinc-400">
+                      Dashed outline: print-safe zone (minimum {PRINT_SAFE_MARGIN_MM} mm from each sheet edge). PDF
                       matches this preview.
                     </p>
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-red-800">Layout is invalid. Go back and adjust step 2.</p>
+                <p className="text-sm text-red-300">Layout is invalid. Go back and adjust step 2.</p>
               )}
 
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-row-reverse">
@@ -605,8 +618,9 @@ export default function CustomLayoutPage() {
             </div>
           )}
         </div>
+        </div>
 
-        <p className="mt-6 text-center text-xs text-gray-400">
+        <p className="mt-6 text-center text-xs text-zinc-500">
           1 mm gap between items · {PRINT_SAFE_MARGIN_MM} mm minimum sheet margins for printing · Single-sided · In your
           browser
         </p>

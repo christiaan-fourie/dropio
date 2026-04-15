@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { FiImage, FiUpload, FiCheck, FiX, FiRotateCw, FiLayers, FiPackage, FiInfo } from "react-icons/fi";
+import { FiImage, FiUpload, FiCheck, FiX, FiRotateCw, FiLayers, FiPackage } from "react-icons/fi";
 import Heading from "@/app/components/Heading";
 import RenderFrame from "@/app/components/RenderFrame";
 import { generateCanvasWrapPDF, downloadPdfBytes } from "@/app/lib/pdf";
@@ -19,10 +19,13 @@ const CANVAS_PRESETS = [
 function SectionTitle({ icon: Icon, id, children }) {
   return (
     <div className="mb-4 flex items-center gap-2">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700" aria-hidden>
+      <span
+        className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/20"
+        aria-hidden
+      >
         <Icon className="h-4 w-4" strokeWidth={2} />
       </span>
-      <h2 id={id} className="text-sm font-bold uppercase tracking-wide text-amber-900">
+      <h2 id={id} className="text-xs font-bold uppercase tracking-wide text-zinc-300">
         {children}
       </h2>
     </div>
@@ -149,11 +152,11 @@ export default function CanvasWrapPage() {
   const currentCanvasIsLandscape = getSafeNum(width, 0) > getSafeNum(height, 0);
 
   const inputClass =
-    "w-full rounded-lg border-2 border-amber-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400";
+    "w-full rounded-lg border-2 border-zinc-600 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 transition-colors hover:border-zinc-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   const uploadDropzone = (compact) => (
     <div
-      className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/50 ${
+      className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-600 bg-zinc-950/80 px-4 py-10 text-center transition-colors hover:border-zinc-500 ${
         compact ? "min-h-[120px] p-4" : "min-h-[220px] p-10"
       }`}
     >
@@ -166,43 +169,49 @@ export default function CanvasWrapPage() {
       />
       {files.length === 0 ? (
         <>
-          <FiUpload className={`mb-2 text-amber-400 ${compact ? "h-8 w-8" : "h-12 w-12"}`} />
-          <p className={`text-center font-medium text-amber-800 ${compact ? "text-sm" : "text-base"}`}>
+          <FiUpload className={`mb-2 text-blue-400 ${compact ? "h-8 w-8" : "h-12 w-12"}`} />
+          <p className={`text-center font-medium text-zinc-200 ${compact ? "text-sm" : "text-base"}`}>
             Drop images here or click to browse
           </p>
           {!compact && (
-            <p className="mt-2 text-center text-sm text-amber-600">Multiple files become multiple PDF pages</p>
+            <p className="mt-2 text-center text-sm text-zinc-500">Multiple files become multiple PDF pages</p>
           )}
         </>
       ) : (
         <>
-          <FiCheck className={`mb-2 text-emerald-500 ${compact ? "h-8 w-8" : "h-12 w-12"}`} />
-          <p className={`font-medium text-emerald-800 ${compact ? "text-sm" : "text-base"}`}>
+          <FiCheck className={`mb-2 text-emerald-400 ${compact ? "h-8 w-8" : "h-12 w-12"}`} />
+          <p className={`font-medium text-emerald-200 ${compact ? "text-sm" : "text-base"}`}>
             {files.length} file{files.length > 1 ? "s" : ""} added
           </p>
-          <p className="mt-1 text-xs text-emerald-700">Click to add more</p>
+          <p className="mt-1 text-xs text-emerald-300/90">Click to add more</p>
         </>
       )}
     </div>
   );
 
   return (
-    <div className="p-8">
-      {/* <Heading
-        icon={FiImage}
-        title="Canvas Wrap"
-        description={
-          hasArtwork
-            ? "Adjust canvas size and wrap settings — the preview matches your PDF layout."
-            : "Upload your artwork first. After that, you can set canvas size, wrap depth, and export."
-        }
-      /> */}
+    <div className="p-6 text-zinc-100">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <Heading
+          icon={FiImage}
+          title="Canvas wrap"
+          description="Upload images, set the visible face and wrap depth, then export a PDF. The live preview matches export geometry."
+        />
+        <div className="flex shrink-0 items-center gap-2 sm:pb-1">
+          <div className={`h-3 w-3 rounded-full ${hasArtwork ? "bg-emerald-500" : "bg-zinc-600"} animate-pulse`} />
+          <span className="text-xs font-medium text-zinc-400">
+            {hasArtwork ? "Artwork loaded" : "Waiting for image"}
+          </span>
+        </div>
+      </div>
 
-      <div className="rounded-2xl border border-amber-200 bg-white/80 p-6 shadow-lg backdrop-blur-sm sm:p-8">
+      <div className="relative overflow-hidden rounded-2xl border border-zinc-700 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-6 shadow-xl shadow-black/30 sm:p-8">
+        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/5 to-indigo-500/5" aria-hidden />
+        <div className="relative z-10">
         {!hasArtwork ? (
           <div className="mx-auto max-w-lg">
-            <p className="mb-6 text-center text-sm leading-relaxed text-amber-900/85">
-              Start by uploading at least one image.
+            <p className="mb-6 text-center text-sm leading-relaxed text-zinc-400">
+              Start by uploading at least one image (multiple files become multiple PDF pages).
             </p>
             {uploadDropzone(false)}
           </div>
@@ -211,16 +220,16 @@ export default function CanvasWrapPage() {
             <div className="space-y-10">
               
 
-              <section className="order-amber-100" aria-labelledby="canvas-face-heading">
+              <section aria-labelledby="canvas-face-heading">
                 <SectionTitle icon={FiLayers} id="canvas-face-heading">
                   Canvas face size
                 </SectionTitle>
-                <p className="mb-4 text-xs leading-relaxed text-amber-800/80">
+                <p className="mb-4 text-xs leading-relaxed text-zinc-400">
                   Choose a preset, then fine-tune width and height. Swap dimensions if orientation should match your
                   image.
                 </p>
 
-                <label className="mb-1.5 block text-xs font-semibold text-amber-800">Preset</label>
+                <label className="mb-1.5 block text-xs font-semibold text-zinc-300">Preset</label>
                 <select
                   value={wrapSize}
                   onChange={handlePresetChange}
@@ -235,7 +244,7 @@ export default function CanvasWrapPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-amber-800">Width (mm)</label>
+                    <label className="mb-1.5 block text-xs font-semibold text-zinc-300">Width (mm)</label>
                     <input
                       type="number"
                       min={100}
@@ -247,7 +256,7 @@ export default function CanvasWrapPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-amber-800">Height (mm)</label>
+                    <label className="mb-1.5 block text-xs font-semibold text-zinc-300">Height (mm)</label>
                     <input
                       type="number"
                       min={100}
@@ -264,13 +273,13 @@ export default function CanvasWrapPage() {
                   <button
                     type="button"
                     onClick={rotateCanvas}
-                    className="inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-200"
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-500/15 px-3 py-2 text-sm font-medium text-zinc-200 ring-1 ring-blue-500/25 transition-colors hover:bg-blue-500/25"
                   >
                     <FiRotateCw className="h-4 w-4" />
                     Swap width / height
                   </button>
-                  <span className="text-xs text-amber-700">
-                    <span className="font-medium text-amber-900">Now:</span>{" "}
+                  <span className="text-xs text-zinc-500">
+                    <span className="font-medium text-zinc-300">Now:</span>{" "}
                     {getSafeNum(width, 0) < 1 || getSafeNum(height, 0) < 1
                       ? "—"
                       : currentCanvasIsLandscape
@@ -280,17 +289,17 @@ export default function CanvasWrapPage() {
                 </div>
               </section>
 
-              <section className="border-t border-amber-100 pt-10" aria-labelledby="wrap-depth-heading">
+              <section className="border-t border-zinc-700/80 pt-10" aria-labelledby="wrap-depth-heading">
                 <SectionTitle icon={FiPackage} id="wrap-depth-heading">
                   Wrap & bleed
                 </SectionTitle>
-                <p className="mb-4 text-xs leading-relaxed text-amber-800/80">
+                <p className="mb-4 text-xs leading-relaxed text-zinc-400">
                   Thickness is frame depth wrapped in fabric. Extra adds a little length at each 90° corner fold.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-amber-800">Thickness (mm)</label>
+                    <label className="mb-1.5 block text-xs font-semibold text-zinc-300">Thickness (mm)</label>
                     <input
                       type="number"
                       min={0}
@@ -301,10 +310,10 @@ export default function CanvasWrapPage() {
                       placeholder="35"
                       className={inputClass}
                     />
-                    <p className="mt-1 text-[11px] text-amber-600">Frame / bar depth (e.g. 35 = 3.5 cm)</p>
+                    <p className="mt-1 text-[11px] text-zinc-500">Frame / bar depth (e.g. 35 = 3.5 cm)</p>
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-amber-800">Extra per 90° fold (mm)</label>
+                    <label className="mb-1.5 block text-xs font-semibold text-zinc-300">Extra per 90° fold (mm)</label>
                     <input
                       type="number"
                       min={0}
@@ -315,7 +324,7 @@ export default function CanvasWrapPage() {
                       placeholder="1"
                       className={inputClass}
                     />
-                    <p className="mt-1 text-[11px] text-amber-600">Per tight corner when wrapping (default 1 mm)</p>
+                    <p className="mt-1 text-[11px] text-zinc-500">Per tight corner when wrapping (default 1 mm)</p>
                   </div>
                 </div>
               </section>
@@ -328,7 +337,7 @@ export default function CanvasWrapPage() {
                 {...getPreviewRootProps({
                   className: `group/preview relative rounded-xl outline-none transition-shadow ${
                     isPreviewDragActive
-                      ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-white"
+                      ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-950"
                       : "ring-0 ring-offset-0"
                   }`,
                 })}
@@ -336,10 +345,10 @@ export default function CanvasWrapPage() {
                 <input {...getPreviewInputProps()} aria-label="Drop image to replace preview artwork" />
                 {isPreviewDragActive && (
                   <div
-                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-amber-50/95 text-center shadow-inner"
+                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-zinc-950/92 text-center shadow-inner"
                     aria-hidden
                   >
-                    <p className="px-4 text-sm font-semibold text-amber-900">Drop to replace image</p>
+                    <p className="px-4 text-sm font-semibold text-zinc-100">Drop to replace image</p>
                   </div>
                 )}
                 <div className="relative">
@@ -353,10 +362,10 @@ export default function CanvasWrapPage() {
                   />
                   {!isPreviewDragActive && (
                     <div
-                      className="pointer-events-none absolute right-2 top-2 z-[1] flex max-w-[min(100%,14rem)] items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[10px] font-medium text-amber-900/80 opacity-0 shadow-sm ring-1 ring-amber-200/60 transition-opacity duration-150 group-hover/preview:opacity-100"
+                      className="pointer-events-none absolute right-2 top-2 z-[1] flex max-w-[min(100%,14rem)] items-center gap-1 rounded-md bg-zinc-900/95 px-2 py-1 text-[10px] font-medium text-zinc-300 opacity-0 shadow-sm ring-1 ring-zinc-600 transition-opacity duration-150 group-hover/preview:opacity-100"
                       aria-hidden
                     >
-                      <FiUpload className="h-3 w-3 shrink-0 text-amber-600" strokeWidth={2} />
+                      <FiUpload className="h-3 w-3 shrink-0 text-blue-400" strokeWidth={2} />
                       <span>Drag a new image onto the preview to replace</span>
                     </div>
                   )}
@@ -375,7 +384,7 @@ export default function CanvasWrapPage() {
                     setThickness(35);
                     setExtra(5);
                   }}
-                  className="w-full rounded-full py-3.5 text-base font-bold shadow-lg transition focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 bg-amber-100 text-amber-800 hover:bg-amber-200"
+                  className="w-full rounded-full border border-zinc-600 bg-zinc-800 py-3.5 text-base font-bold text-zinc-200 shadow-lg transition hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
                 >
                   Reset
                 </button>
@@ -385,10 +394,10 @@ export default function CanvasWrapPage() {
                   type="button"
                   disabled={isGenerating}
                   onClick={generateCanvasPDF}
-                  className={`w-full rounded-full py-3.5 text-base font-bold shadow-lg transition focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 ${
+                  className={`w-full rounded-full py-3.5 text-base font-bold shadow-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-950 ${
                     !isGenerating
-                      ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600"
-                      : "cursor-wait bg-amber-400/80 text-white opacity-90"
+                      ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-400 hover:to-pink-500"
+                      : "cursor-wait bg-zinc-600 text-zinc-300 opacity-90"
                   }`}
                 >
                   {isGenerating ? "Generating PDF…" : "Generate PDF"}
@@ -397,6 +406,7 @@ export default function CanvasWrapPage() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

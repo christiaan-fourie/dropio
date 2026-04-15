@@ -63,7 +63,7 @@ export default function HeaderToolsDropdown({
           className={panelClassName}
         >
           {panelHeading ? (
-            <div className="mb-1 px-4 py-2 text-[10px] font-bold uppercase text-gray-400">{panelHeading}</div>
+            <div className="mb-1 px-4 py-2 text-[10px] font-bold uppercase text-zinc-500">{panelHeading}</div>
           ) : null}
           {links.map(({ href, label }) => (
             <Link

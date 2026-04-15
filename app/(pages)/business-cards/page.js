@@ -158,7 +158,7 @@ export default function BusinessCardsPage() {
   const canGenerate = frontFiles.length > 0 && (!doubleSided || backFiles.length > 0);
 
   return (
-    <div className="p-6">
+    <div className="p-6 text-zinc-100">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <Heading
           icon={FiCreditCard}
@@ -166,19 +166,19 @@ export default function BusinessCardsPage() {
           description="Configure sheet size, duplex mode, and upload front and back images."
         />
         <div className="flex shrink-0 items-center gap-2 sm:pb-1">
-          <div className={`h-3 w-3 rounded-full ${frontFiles.length > 0 ? "bg-emerald-500" : "bg-gray-300"} animate-pulse`} />
-          <span className="text-xs font-medium text-gray-600">
+          <div className={`h-3 w-3 rounded-full ${frontFiles.length > 0 ? "bg-emerald-500" : "bg-zinc-600"} animate-pulse`} />
+          <span className="text-xs font-medium text-zinc-400">
             {frontFiles.length > 0 ? "Ready" : "Waiting for files"}
           </span>
         </div>
       </div>
 
       {/* INSANE Streamlined Settings & Upload Row */}
-      <div className="relative mb-6 p-6 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl border border-slate-200 shadow-xl">
+      <div className="relative mb-6 rounded-2xl border border-zinc-700 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-6 shadow-xl shadow-black/30">
         {/* Animated Background Elements */}
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 rounded-2xl"></div>
-        <div className="absolute top-4 right-4 w-32 h-32 bg-gradient-to-br from-blue-200/30 to-indigo-300/30 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-4 left-4 w-24 h-24 bg-gradient-to-br from-emerald-200/30 to-cyan-300/30 rounded-full blur-2xl"></div>
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10" />
+        <div className="absolute right-4 top-4 h-32 w-32 rounded-full bg-gradient-to-br from-blue-600/20 to-indigo-600/20 blur-3xl" />
+        <div className="absolute bottom-4 left-4 h-24 w-24 rounded-full bg-gradient-to-br from-emerald-600/15 to-cyan-600/15 blur-2xl" />
         
         <div className="relative z-10">
           {/* Main Configuration Grid */}
@@ -186,19 +186,19 @@ export default function BusinessCardsPage() {
             
             {/* Settings Panel - 4 columns */}
             <div className="lg:col-span-4 space-y-4">
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-lg">
+              <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/80 p-4 shadow-lg shadow-black/20 backdrop-blur-sm">
                 <div className="grid grid-cols-1 gap-4">
                   
                   {/* Sheet Size */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                    <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-zinc-300">
                       Sheet Size
                     </label>
                     <div className="relative">
                       <select
                         value={sheetSize}
                         onChange={(e) => setSheetSize(e.target.value)}
-                        className="w-full px-4 py-3 text-sm font-medium bg-white border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-300 shadow-sm"
+                        className="w-full rounded-lg border-2 border-zinc-600 bg-zinc-950 px-4 py-3 text-sm font-medium text-zinc-100 shadow-sm transition-all duration-200 hover:border-blue-500/50 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="A4">A4 (10 cards)</option>
                         <option value="A3">A3 (24 cards)</option>
@@ -210,7 +210,7 @@ export default function BusinessCardsPage() {
 
                   {/* Double-sided Toggle */}
                   <div>
-                    <label className="block text-xs font-extrabold text-gray-800 mb-2 uppercase tracking-widest drop-shadow-sm">
+                    <label className="mb-2 block text-xs font-extrabold uppercase tracking-widest text-zinc-200 drop-shadow-sm">
                       Print Mode
                     </label>
                     <div className="relative flex items-center">
@@ -219,30 +219,30 @@ export default function BusinessCardsPage() {
                         className={`w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-extrabold text-base transition-all duration-300 transform hover:scale-105 shadow-xl border-2 focus:outline-none focus:ring-2 focus:ring-amber-400
                           ${doubleSided
                             ? 'bg-gradient-to-r from-amber-400 via-orange-400 to-orange-600 text-white border-amber-400 shadow-amber-400/30'
-                            : 'bg-gradient-to-r from-gray-100 via-gray-200 to-gray-300 text-gray-700 border-gray-200 hover:from-gray-200 hover:to-gray-400'}
+                            : 'border-zinc-600 bg-gradient-to-r from-zinc-800 via-zinc-800 to-zinc-900 text-zinc-200 hover:from-zinc-700 hover:to-zinc-800'}
                         `}
                         aria-pressed={doubleSided}
                         tabIndex={0}
                       >
-                        <span className={`transition-colors duration-200 ${doubleSided ? 'text-white' : 'text-gray-700'}`}>
+                        <span className={`transition-colors duration-200 ${doubleSided ? "text-white" : "text-zinc-200"}`}>
                           {doubleSided ? 'Double-Sided' : 'Single-Sided'}
                         </span>
                         <FaToggleOn
                           className={`ml-2 text-xl transition-transform duration-300 ${
                             doubleSided
                               ? 'rotate-0 text-white drop-shadow-[0_2px_8px_rgba(255,183,77,0.5)]'
-                              : '-rotate-90 text-gray-400'
+                              : "-rotate-90 text-zinc-500"
                           }`}
                         />
                       </button>
                       <span
-                        className={`absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow ${
-                          doubleSided ? 'bg-amber-400 animate-pulse' : 'bg-gray-300'
+                        className={`absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-zinc-950 shadow ${
+                          doubleSided ? "animate-pulse bg-amber-400" : "bg-zinc-600"
                         }`}
                         aria-hidden="true"
                       ></span>
                     </div>
-                    <div className="text-xs text-gray-500 mt-2">
+                    <div className="mt-2 text-xs text-zinc-500">
                       {doubleSided
                         ? 'Back images will be mirrored for perfect duplex alignment.'
                         : 'Single-sided: only front images will be printed.'}
@@ -258,7 +258,7 @@ export default function BusinessCardsPage() {
                 
                 {/* Front Images Upload */}
                 <div className="relative group">
-                  <label className="block text-xs font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                  <label className="block text-xs font-bold text-zinc-300 mb-3 uppercase tracking-wide">
                     Front Images
                     {frontFiles.length > 0 && (
                       <span className="ml-2 px-2 py-1 bg-blue-500 text-white text-xs rounded-full font-bold">
@@ -269,12 +269,12 @@ export default function BusinessCardsPage() {
                   
                   <div
                     {...getFrontRootProps()}
-                    className={`relative overflow-hidden border-3 border-dashed rounded-2xl cursor-pointer transition-all duration-300 transform hover:scale-[1.02] ${
+                    className={`relative transform cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed transition-all duration-300 hover:scale-[1.02] ${
                       frontDragActive
-                        ? "border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl scale-[1.02]"
+                        ? "scale-[1.02] border-blue-400 bg-gradient-to-br from-blue-950/80 to-indigo-950/80 shadow-2xl"
                         : frontFiles.length > 0
-                        ? "border-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100 shadow-xl hover:shadow-2xl"
-                        : "border-gray-300 bg-gradient-to-br from-gray-50 to-slate-100 hover:border-blue-400 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 shadow-lg hover:shadow-xl"
+                          ? "border-emerald-500/60 bg-gradient-to-br from-emerald-950/50 to-green-950/50 shadow-xl hover:shadow-2xl"
+                          : "border-zinc-600 bg-gradient-to-br from-zinc-900 to-zinc-950 shadow-lg hover:border-blue-500/50 hover:shadow-xl"
                     }`}
                   >
                     <input {...getFrontInputProps()} />
@@ -286,16 +286,16 @@ export default function BusinessCardsPage() {
                           <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-300">
                             <FiUpload className="w-8 h-8 text-white" />
                           </div>
-                          <p className="text-sm font-bold text-gray-700 mb-1">Drop your front images here</p>
-                          <p className="text-xs text-gray-500">or click to browse files</p>
+                          <p className="text-sm font-bold text-zinc-300 mb-1">Drop your front images here</p>
+                          <p className="text-xs text-zinc-500">or click to browse files</p>
                         </>
                       ) : (
                         <>
                           <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
                             <FiCheck className="w-8 h-8 text-white" />
                           </div>
-                          <p className="text-sm font-bold text-emerald-700">
-                            {frontFiles.length} file{frontFiles.length !== 1 ? 's' : ''} ready to print
+                          <p className="text-sm font-bold text-emerald-300">
+                            {frontFiles.length} file{frontFiles.length !== 1 ? "s" : ""} ready to print
                           </p>
                         </>
                       )}
@@ -311,12 +311,12 @@ export default function BusinessCardsPage() {
                   {frontFiles.length > 0 && (
                     <div className="mt-3 space-y-2 max-h-24 overflow-y-auto">
                       {frontFiles.slice(0, 3).map((file, index) => (
-                        <div key={index} className="flex items-center justify-between bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/50 shadow-sm">
+                        <div key={index} className="flex items-center justify-between rounded-lg border border-zinc-700 bg-zinc-900/90 px-3 py-2 shadow-sm backdrop-blur-sm">
                           <div className="flex items-center min-w-0 flex-1">
                             <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-md flex items-center justify-center mr-2">
                               <FiImage className="w-3 h-3 text-white" />
                             </div>
-                            <span className="text-xs font-medium text-gray-700 truncate">{file.name}</span>
+                            <span className="text-xs font-medium text-zinc-300 truncate">{file.name}</span>
                           </div>
                           <button
                             onClick={(e) => {
@@ -330,7 +330,7 @@ export default function BusinessCardsPage() {
                         </div>
                       ))}
                       {frontFiles.length > 3 && (
-                        <div className="text-xs text-gray-500 text-center py-1">
+                        <div className="text-xs text-zinc-500 text-center py-1">
                           +{frontFiles.length - 3} more files
                         </div>
                       )}
@@ -341,7 +341,7 @@ export default function BusinessCardsPage() {
                 {/* Back Images Upload (if double-sided) */}
                 {doubleSided && (
                   <div className="relative group">
-                    <label className="block text-xs font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                    <label className="block text-xs font-bold text-zinc-300 mb-3 uppercase tracking-wide">
                       Back Images
                       {backFiles.length > 0 && (
                         <span className="ml-2 px-2 py-1 bg-amber-500 text-white text-xs rounded-full font-bold">
@@ -352,12 +352,12 @@ export default function BusinessCardsPage() {
                     
                     <div
                       {...getBackRootProps()}
-                      className={`relative overflow-hidden border-3 border-dashed rounded-2xl cursor-pointer transition-all duration-300 transform hover:scale-[1.02] ${
+                      className={`relative transform cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed transition-all duration-300 hover:scale-[1.02] ${
                         backDragActive
-                          ? "border-amber-500 bg-gradient-to-br from-amber-50 to-orange-100 shadow-2xl scale-[1.02]"
+                          ? "scale-[1.02] border-amber-400 bg-gradient-to-br from-amber-950/70 to-orange-950/70 shadow-2xl"
                           : backFiles.length > 0
-                          ? "border-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100 shadow-xl hover:shadow-2xl"
-                          : "border-gray-300 bg-gradient-to-br from-gray-50 to-slate-100 hover:border-amber-400 hover:bg-gradient-to-br hover:from-amber-50 hover:to-orange-50 shadow-lg hover:shadow-xl"
+                            ? "border-emerald-500/60 bg-gradient-to-br from-emerald-950/50 to-green-950/50 shadow-xl hover:shadow-2xl"
+                            : "border-zinc-600 bg-gradient-to-br from-zinc-900 to-zinc-950 shadow-lg hover:border-amber-500/50 hover:shadow-xl"
                       }`}
                     >
                       <input {...getBackInputProps()} />
@@ -368,16 +368,16 @@ export default function BusinessCardsPage() {
                             <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-300">
                               <FiUpload className="w-8 h-8 text-white" />
                             </div>
-                            <p className="text-sm font-bold text-gray-700 mb-1">Drop your back images here</p>
-                            <p className="text-xs text-gray-500">for double-sided printing</p>
+                            <p className="text-sm font-bold text-zinc-300 mb-1">Drop your back images here</p>
+                            <p className="text-xs text-zinc-500">for double-sided printing</p>
                           </>
                         ) : (
                           <>
                             <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
                               <FiCheck className="w-8 h-8 text-white" />
                             </div>
-                            <p className="text-sm font-bold text-emerald-700">
-                              {backFiles.length} back file{backFiles.length !== 1 ? 's' : ''} ready
+                            <p className="text-sm font-bold text-emerald-300">
+                              {backFiles.length} back file{backFiles.length !== 1 ? "s" : ""} ready
                             </p>
                           </>
                         )}
@@ -393,12 +393,12 @@ export default function BusinessCardsPage() {
                     {backFiles.length > 0 && (
                       <div className="mt-3 space-y-2 max-h-24 overflow-y-auto">
                         {backFiles.slice(0, 3).map((file, index) => (
-                          <div key={index} className="flex items-center justify-between bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/50 shadow-sm">
+                          <div key={index} className="flex items-center justify-between rounded-lg border border-zinc-700 bg-zinc-900/90 px-3 py-2 shadow-sm backdrop-blur-sm">
                             <div className="flex items-center min-w-0 flex-1">
                               <div className="w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-md flex items-center justify-center mr-2">
                                 <FiImage className="w-3 h-3 text-white" />
                               </div>
-                              <span className="text-xs font-medium text-gray-700 truncate">{file.name}</span>
+                              <span className="text-xs font-medium text-zinc-300 truncate">{file.name}</span>
                             </div>
                             <button
                               onClick={(e) => {
@@ -412,7 +412,7 @@ export default function BusinessCardsPage() {
                           </div>
                         ))}
                         {backFiles.length > 3 && (
-                          <div className="text-xs text-gray-500 text-center py-1">
+                          <div className="text-xs text-zinc-500 text-center py-1">
                             +{backFiles.length - 3} more files
                           </div>
                         )}
@@ -431,7 +431,7 @@ export default function BusinessCardsPage() {
             onClick={handleGeneratePDF}
             disabled={!canGenerate || isGenerating}
             className={`z-50 px-6 py-3 rounded-full text-white font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-              ${canGenerate ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600' : 'bg-gray-300 cursor-not-allowed'}
+              ${canGenerate ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-500" : "cursor-not-allowed bg-zinc-700 text-zinc-400"}
               ${isGenerating ? 'opacity-75 cursor-wait' : ''}`}
           >
             {isGenerating ? (
