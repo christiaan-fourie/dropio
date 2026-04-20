@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { FiImage, FiUpload, FiCheck, FiX, FiRotateCw, FiLayers, FiPackage, FiLoader } from "react-icons/fi";
+import { FiImage, FiUpload, FiCheck, FiX, FiRotateCw, FiLayers, FiPackage, FiLoader, FiAlertTriangle } from "react-icons/fi";
 import Heading from "@/app/components/Heading";
 import RenderFrame from "@/app/components/RenderFrame";
 import { generateCanvasWrapPDF, downloadPdfBytes } from "@/app/lib/pdf";
@@ -49,6 +49,7 @@ export default function CanvasWrapPage() {
   const [extra, setExtra] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isProcessingUploads, setIsProcessingUploads] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handleNumberChange = (setter) => (e) => {
     const val = e.target.value;
@@ -122,6 +123,40 @@ export default function CanvasWrapPage() {
   function removeFile(idx) {
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   }
+
+  function performReset() {
+    setFiles([]);
+    setPreviewUrl(null);
+    setWrapSize("A3");
+    setWidth(400);
+    setHeight(300);
+    setThickness(35);
+    setExtra(5);
+  }
+
+  function confirmReset() {
+    performReset();
+    setShowResetConfirm(false);
+  }
+
+  const DEFAULTS = { wrapSize: "A3", width: 400, height: 300, thickness: 35, extra: 5 };
+  const hasDirtyState =
+    hasArtwork ||
+    wrapSize !== DEFAULTS.wrapSize ||
+    Number(width) !== DEFAULTS.width ||
+    Number(height) !== DEFAULTS.height ||
+    Number(thickness) !== DEFAULTS.thickness ||
+    Number(extra) !== DEFAULTS.extra;
+
+  useEffect(() => {
+    if (!showResetConfirm) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setShowResetConfirm(false);
+      if (e.key === "Enter") confirmReset();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showResetConfirm]);
 
   function handlePresetChange(e) {
     const preset = CANVAS_PRESETS.find((p) => p.key === e.target.value);
@@ -408,13 +443,11 @@ export default function CanvasWrapPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setFiles([]);
-                    setPreviewUrl(null);
-                    setWrapSize("A3");
-                    setWidth(400);
-                    setHeight(300);
-                    setThickness(35);
-                    setExtra(5);
+                    if (hasDirtyState) {
+                      setShowResetConfirm(true);
+                    } else {
+                      performReset();
+                    }
                   }}
                   className="w-full rounded-full border border-zinc-600 bg-zinc-800 py-3.5 text-base font-bold text-zinc-200 shadow-lg transition hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
                 >
@@ -440,6 +473,68 @@ export default function CanvasWrapPage() {
         )}
         </div>
       </div>
+
+      {showResetConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-confirm-title"
+          aria-describedby="reset-confirm-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
+          <div
+            className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
+            onClick={() => setShowResetConfirm(false)}
+            aria-hidden
+          />
+          <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/50">
+            <div className="flex items-start gap-4 p-6">
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30"
+                aria-hidden
+              >
+                <FiAlertTriangle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 id="reset-confirm-title" className="text-base font-semibold text-zinc-100">
+                  Reset canvas layout?
+                </h3>
+                <p id="reset-confirm-desc" className="mt-1.5 text-sm leading-relaxed text-zinc-400">
+                  This will remove your
+                  {hasArtwork ? <span className="font-medium text-zinc-200"> uploaded image</span> : null}
+                  {hasArtwork ? " and " : " "}
+                  restore every setting (size, thickness, bleed) to its default. This can’t be undone.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                aria-label="Close"
+                className="shrink-0 rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+              >
+                <FiX className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-zinc-800 bg-zinc-950/50 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmReset}
+                autoFocus
+                className="rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-colors hover:from-amber-400 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-zinc-950"
+              >
+                Reset everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
