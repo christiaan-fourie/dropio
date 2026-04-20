@@ -6,6 +6,7 @@ import { FiUpload, FiImage, FiX, FiCheck, FiLoader, FiEye, FiCreditCard } from "
 import { FaToggleOn } from "react-icons/fa6";
 import Heading from "@/app/components/Heading";
 import { generateBusinessCardsPDF, downloadPdfBytes } from "@/app/lib/pdf";
+import { normalizeUploadsToImages } from "@/app/lib/file/pdfToImage";
 
 const BUSINESS_CARD = {
   width: 90,  // 9cm in mm
@@ -79,6 +80,8 @@ export default function BusinessCardsPage() {
   const [sheets, setSheets] = useState(1);
   const [doubleSided, setDoubleSided] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isProcessingFront, setIsProcessingFront] = useState(false);
+  const [isProcessingBack, setIsProcessingBack] = useState(false);
 
   const layout = calculateLayout(sheetSize, sheets * calculateLayout(sheetSize, 1).cardsPerSheet);
 
@@ -90,12 +93,30 @@ export default function BusinessCardsPage() {
     }
   }, [frontFiles.length, layout.cardsPerSheet]);
 
-  const onDropFront = (acceptedFiles) => {
-    setFrontFiles(prev => [...prev, ...acceptedFiles]);
+  const onDropFront = async (acceptedFiles) => {
+    setIsProcessingFront(true);
+    try {
+      const normalized = await normalizeUploadsToImages(acceptedFiles);
+      setFrontFiles(prev => [...prev, ...normalized]);
+    } catch (err) {
+      console.error("Failed to process uploads:", err);
+      alert(`Failed to process upload: ${err.message}`);
+    } finally {
+      setIsProcessingFront(false);
+    }
   };
 
-  const onDropBack = (acceptedFiles) => {
-    setBackFiles(prev => [...prev, ...acceptedFiles]);
+  const onDropBack = async (acceptedFiles) => {
+    setIsProcessingBack(true);
+    try {
+      const normalized = await normalizeUploadsToImages(acceptedFiles);
+      setBackFiles(prev => [...prev, ...normalized]);
+    } catch (err) {
+      console.error("Failed to process uploads:", err);
+      alert(`Failed to process upload: ${err.message}`);
+    } finally {
+      setIsProcessingBack(false);
+    }
   };
 
   const { getRootProps: getFrontRootProps, getInputProps: getFrontInputProps, isDragActive: frontDragActive } = useDropzone({
@@ -155,7 +176,11 @@ export default function BusinessCardsPage() {
     }
   };
 
-  const canGenerate = frontFiles.length > 0 && (!doubleSided || backFiles.length > 0);
+  const canGenerate =
+    frontFiles.length > 0 &&
+    (!doubleSided || backFiles.length > 0) &&
+    !isProcessingFront &&
+    !isProcessingBack;
 
   return (
     <div className="p-6 text-zinc-100">
@@ -281,12 +306,20 @@ export default function BusinessCardsPage() {
                     
                     {/* Upload Area Content */}
                     <div className="p-6 text-center min-h-[120px] flex flex-col justify-center">
-                      {frontFiles.length === 0 ? (
+                      {isProcessingFront ? (
+                        <>
+                          <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                            <FiLoader className="w-8 h-8 text-white animate-spin" />
+                          </div>
+                          <p className="text-sm font-bold text-zinc-300 mb-1">Processing files…</p>
+                          <p className="text-xs text-zinc-500">Rasterizing PDFs to images</p>
+                        </>
+                      ) : frontFiles.length === 0 ? (
                         <>
                           <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-300">
                             <FiUpload className="w-8 h-8 text-white" />
                           </div>
-                          <p className="text-sm font-bold text-zinc-300 mb-1">Drop your front images here</p>
+                          <p className="text-sm font-bold text-zinc-300 mb-1">Drop your front images or PDFs here</p>
                           <p className="text-xs text-zinc-500">or click to browse files</p>
                         </>
                       ) : (
@@ -363,12 +396,20 @@ export default function BusinessCardsPage() {
                       <input {...getBackInputProps()} />
                       
                       <div className="p-6 text-center min-h-[120px] flex flex-col justify-center">
-                        {backFiles.length === 0 ? (
+                        {isProcessingBack ? (
+                          <>
+                            <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
+                              <FiLoader className="w-8 h-8 text-white animate-spin" />
+                            </div>
+                            <p className="text-sm font-bold text-zinc-300 mb-1">Processing files…</p>
+                            <p className="text-xs text-zinc-500">Rasterizing PDFs to images</p>
+                          </>
+                        ) : backFiles.length === 0 ? (
                           <>
                             <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-300">
                               <FiUpload className="w-8 h-8 text-white" />
                             </div>
-                            <p className="text-sm font-bold text-zinc-300 mb-1">Drop your back images here</p>
+                            <p className="text-sm font-bold text-zinc-300 mb-1">Drop your back images or PDFs here</p>
                             <p className="text-xs text-zinc-500">for double-sided printing</p>
                           </>
                         ) : (

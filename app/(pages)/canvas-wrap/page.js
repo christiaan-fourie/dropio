@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { FiImage, FiUpload, FiCheck, FiX, FiRotateCw, FiLayers, FiPackage } from "react-icons/fi";
+import { FiImage, FiUpload, FiCheck, FiX, FiRotateCw, FiLayers, FiPackage, FiLoader } from "react-icons/fi";
 import Heading from "@/app/components/Heading";
 import RenderFrame from "@/app/components/RenderFrame";
 import { generateCanvasWrapPDF, downloadPdfBytes } from "@/app/lib/pdf";
+import { normalizeUploadsToImages } from "@/app/lib/file/pdfToImage";
 
 const CANVAS_PRESETS = [
   { key: "A4", label: "A4 Canvas (300×200mm)", width: 300, height: 200, printOn: "A3" },
@@ -47,6 +48,7 @@ export default function CanvasWrapPage() {
   const [thickness, setThickness] = useState(35);
   const [extra, setExtra] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isProcessingUploads, setIsProcessingUploads] = useState(false);
 
   const handleNumberChange = (setter) => (e) => {
     const val = e.target.value;
@@ -61,9 +63,17 @@ export default function CanvasWrapPage() {
 
   const hasArtwork = files.length > 0;
 
-  const onPreviewDrop = useCallback((acceptedFiles) => {
-    if (acceptedFiles.length > 0) {
-      setFiles([acceptedFiles[0]]);
+  const onPreviewDrop = useCallback(async (acceptedFiles) => {
+    if (acceptedFiles.length === 0) return;
+    setIsProcessingUploads(true);
+    try {
+      const normalized = await normalizeUploadsToImages([acceptedFiles[0]]);
+      setFiles([normalized[0]]);
+    } catch (err) {
+      console.error("Failed to process upload:", err);
+      alert(`Failed to process upload: ${err.message}`);
+    } finally {
+      setIsProcessingUploads(false);
     }
   }, []);
 
@@ -74,6 +84,7 @@ export default function CanvasWrapPage() {
   } = useDropzone({
     accept: {
       "image/*": [".png", ".jpg", ".jpeg", ".tiff", ".tif"],
+      "application/pdf": [".pdf"],
     },
     noClick: true,
     disabled: !hasArtwork,
@@ -94,8 +105,18 @@ export default function CanvasWrapPage() {
 
   async function handleFileChange(e) {
     const newFiles = Array.from(e.target.files);
-    setFiles((prev) => [...prev, ...newFiles]);
     e.target.value = "";
+    if (newFiles.length === 0) return;
+    setIsProcessingUploads(true);
+    try {
+      const normalized = await normalizeUploadsToImages(newFiles);
+      setFiles((prev) => [...prev, ...normalized]);
+    } catch (err) {
+      console.error("Failed to process uploads:", err);
+      alert(`Failed to process upload: ${err.message}`);
+    } finally {
+      setIsProcessingUploads(false);
+    }
   }
 
   function removeFile(idx) {
@@ -162,16 +183,27 @@ export default function CanvasWrapPage() {
     >
       <input
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf,.pdf"
         multiple
         onChange={handleFileChange}
+        disabled={isProcessingUploads}
         className="absolute inset-0 z-[2] cursor-pointer opacity-0"
       />
-      {files.length === 0 ? (
+      {isProcessingUploads ? (
+        <>
+          <FiLoader className={`mb-2 animate-spin text-blue-400 ${compact ? "h-8 w-8" : "h-12 w-12"}`} />
+          <p className={`text-center font-medium text-zinc-200 ${compact ? "text-sm" : "text-base"}`}>
+            Processing files…
+          </p>
+          {!compact && (
+            <p className="mt-2 text-center text-sm text-zinc-500">Rasterizing PDFs to images</p>
+          )}
+        </>
+      ) : files.length === 0 ? (
         <>
           <FiUpload className={`mb-2 text-blue-400 ${compact ? "h-8 w-8" : "h-12 w-12"}`} />
           <p className={`text-center font-medium text-zinc-200 ${compact ? "text-sm" : "text-base"}`}>
-            Drop images here or click to browse
+            Drop images or PDFs here or click to browse
           </p>
           {!compact && (
             <p className="mt-2 text-center text-sm text-zinc-500">Multiple files become multiple PDF pages</p>

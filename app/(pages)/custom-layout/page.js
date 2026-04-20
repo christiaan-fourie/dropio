@@ -5,6 +5,7 @@ import { useDropzone } from "react-dropzone";
 import { FiUpload, FiImage, FiX, FiLoader, FiGrid, FiTool, FiDownload, FiChevronRight, FiChevronLeft } from "react-icons/fi";
 import Heading from "@/app/components/Heading";
 import { generateCustomLayoutPDF, downloadPdfBytes } from "@/app/lib/pdf";
+import { normalizeUploadsToImages } from "@/app/lib/file/pdfToImage";
 import {
   SHEETS,
   pickBestSheetSize,
@@ -63,6 +64,7 @@ export default function CustomLayoutPage() {
   const [autoSheetSize, setAutoSheetSize] = useState(true);
   const [manualSheetSize, setManualSheetSize] = useState("A4");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isProcessingUploads, setIsProcessingUploads] = useState(false);
   /** Step 2: user sets mm themselves vs copies-per-sheet (we compute mm) */
   const [step2Mode, setStep2Mode] = useState("dimensions");
   const [packingMode, setPackingMode] = useState("auto");
@@ -73,8 +75,17 @@ export default function CustomLayoutPage() {
 
   const imageSource = files.length <= 1 ? "single" : "cycle";
 
-  const onDrop = (acceptedFiles) => {
-    setFiles((prev) => [...prev, ...acceptedFiles]);
+  const onDrop = async (acceptedFiles) => {
+    setIsProcessingUploads(true);
+    try {
+      const normalized = await normalizeUploadsToImages(acceptedFiles);
+      setFiles((prev) => [...prev, ...normalized]);
+    } catch (err) {
+      console.error("Failed to process uploads:", err);
+      alert(`Failed to process upload: ${err.message}`);
+    } finally {
+      setIsProcessingUploads(false);
+    }
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -272,9 +283,19 @@ export default function CustomLayoutPage() {
               </p>
               <div {...getRootProps()} className={dropClass}>
                 <input {...getInputProps()} />
-                <FiUpload className="mx-auto mb-2 h-7 w-7 text-zinc-500" />
-                <p className="font-medium text-zinc-200">Drop images or PDFs here, or click to browse</p>
-                <p className="mt-1 text-xs text-zinc-500">PNG, JPG, TIFF, PDF</p>
+                {isProcessingUploads ? (
+                  <>
+                    <FiLoader className="mx-auto mb-2 h-7 w-7 animate-spin text-zinc-300" />
+                    <p className="font-medium text-zinc-200">Processing files…</p>
+                    <p className="mt-1 text-xs text-zinc-500">Rasterizing PDFs to images</p>
+                  </>
+                ) : (
+                  <>
+                    <FiUpload className="mx-auto mb-2 h-7 w-7 text-zinc-500" />
+                    <p className="font-medium text-zinc-200">Drop images or PDFs here, or click to browse</p>
+                    <p className="mt-1 text-xs text-zinc-500">PNG, JPG, TIFF, PDF</p>
+                  </>
+                )}
               </div>
               {files.length > 0 && (
                 <>
