@@ -184,19 +184,11 @@ export default function BusinessCardsPage() {
 
   return (
     <div className="p-6 text-zinc-100">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <Heading
-          icon={FiCreditCard}
-          title="Business Cards"
-          description="Configure sheet size, duplex mode, and upload front and back images."
-        />
-        <div className="flex shrink-0 items-center gap-2 sm:pb-1">
-          <div className={`h-3 w-3 rounded-full ${frontFiles.length > 0 ? "bg-emerald-500" : "bg-zinc-600"} animate-pulse`} />
-          <span className="text-xs font-medium text-zinc-400">
-            {frontFiles.length > 0 ? "Ready" : "Waiting for files"}
-          </span>
-        </div>
-      </div>
+      <Heading
+        icon={FiCreditCard}
+        title="Business Cards"
+        description="Configure sheet size, duplex mode, and upload front and back images."
+      />
 
       {/* INSANE Streamlined Settings & Upload Row */}
       <div className="relative mb-6 rounded-2xl border border-zinc-700 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-6 shadow-xl shadow-black/30">

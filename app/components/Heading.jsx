@@ -21,4 +21,3 @@ export default function Heading({ icon: Icon, title, description }) {
     </header>
   );
 }
-

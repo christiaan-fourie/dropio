@@ -251,22 +251,11 @@ export default function CustomLayoutPage() {
 
   return (
     <div className="p-6 text-zinc-100">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <Heading
-          icon={FiGrid}
-          title="Custom layout"
-          description="Upload files, then either set sizes yourself or pick how many fit on each page—we’ll work out the dimensions."
-        />
-        <div className="flex shrink-0 items-center gap-2 sm:pb-1">
-          <div
-            className={`h-3 w-3 rounded-full ${files.length > 0 ? "animate-pulse bg-emerald-500" : "bg-zinc-600"}`}
-          />
-          <span className="text-xs font-medium text-zinc-400">
-            Step {step} of 3
-            {files.length > 0 ? ` · ${files.length} file${files.length !== 1 ? "s" : ""}` : ""}
-          </span>
-        </div>
-      </div>
+      <Heading
+        icon={FiGrid}
+        title="Custom layout"
+        description="Upload files, then either set sizes yourself or pick how many fit on each page—we’ll work out the dimensions."
+      />
 
       <div className="mx-auto max-w-5xl">
         <StepIndicator step={step} />
