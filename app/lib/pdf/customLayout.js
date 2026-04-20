@@ -144,7 +144,7 @@ export async function generateCustomLayoutPDF({
   if (!quantity || quantity < 1 || quantity > 10000) throw new Error("Invalid quantity (1-10000)");
   if (doubleSided && !backFiles?.length) throw new Error("Back images required for double-sided printing");
 
-  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/tiff", "application/pdf"];
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/tiff"];
   for (const file of frontFiles) {
     if (!allowedTypes.includes(file.type)) {
       throw new Error(`Unsupported file type: ${file.type}. Please use JPEG, PNG, TIFF, or PDF.`);
@@ -189,7 +189,7 @@ export async function generateCustomLayoutPDF({
     const imageBytes = await processImageForPDF(file);
     try {
       if (file.type === "image/png") processedFrontImages.push(await pdfDoc.embedPng(imageBytes));
-      else if (file.type !== "application/pdf") processedFrontImages.push(await pdfDoc.embedJpg(imageBytes));
+      else processedFrontImages.push(await pdfDoc.embedJpg(imageBytes));
     } catch {
       // Ignore unreadable image.
     }
@@ -203,7 +203,7 @@ export async function generateCustomLayoutPDF({
       const imageBytes = await processImageForPDF(file);
       try {
         if (file.type === "image/png") processedBackImages.push(await pdfDoc.embedPng(imageBytes));
-        else if (file.type !== "application/pdf") processedBackImages.push(await pdfDoc.embedJpg(imageBytes));
+        else processedBackImages.push(await pdfDoc.embedJpg(imageBytes));
       } catch {
         // Ignore unreadable image.
       }
