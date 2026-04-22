@@ -14,6 +14,7 @@ import {
   FiAlignCenter,
   FiDownload,
   FiLoader,
+  FiScissors,
 } from "react-icons/fi";
 import Heading from "@/app/components/Heading";
 import { generatePagePDF, downloadPdfBytes } from "@/app/lib/pdf";
@@ -35,6 +36,7 @@ import { generatePagePDF, downloadPdfBytes } from "@/app/lib/pdf";
  *     width: number,         // mm
  *     height: number,        // mm
  *     layer: number,         // stacking order; higher renders on top
+ *     cutLine?: boolean,     // when true, a 0.5pt cutting line is stroked around the element
  *   }>
  * }
  */
@@ -182,6 +184,7 @@ export default function PageClient() {
             width: w,
             height: h,
             layer: 0,
+            cutLine: false,
           });
         } catch (err) {
           console.error(err);
@@ -738,6 +741,32 @@ function ElementProperties({ element, onChange, onReorder, onDelete }) {
             </button>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => onChange({ cutLine: !element.cutLine })}
+          aria-pressed={!!element.cutLine}
+          title="Toggle 0.5pt cutting line"
+          className={`inline-flex w-full items-center justify-between gap-1.5 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+            element.cutLine
+              ? "border-pink-500/50 bg-pink-500/15 text-pink-200 hover:bg-pink-500/25"
+              : "border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+          }`}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <FiScissors className="h-3.5 w-3.5" />
+            Cutting line · 0.5pt
+          </span>
+          <span
+            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+              element.cutLine
+                ? "bg-pink-500/30 text-pink-100"
+                : "bg-zinc-800 text-zinc-400"
+            }`}
+          >
+            {element.cutLine ? "On" : "Off"}
+          </span>
+        </button>
       </div>
     </section>
   );
@@ -1091,6 +1120,17 @@ function ElementView({ element, scale, isSelected, onSelect, onDragMove, onDragE
           alt={element.name}
           draggable={false}
           style={{ width: "100%", height: "100%", objectFit: "fill", display: "block", pointerEvents: "none" }}
+        />
+      ) : null}
+      {element.cutLine ? (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            border: "1px dashed #ec4899",
+            pointerEvents: "none",
+          }}
         />
       ) : null}
       {isSelected ? (

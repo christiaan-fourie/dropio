@@ -3,6 +3,8 @@ import jsPDF from "jspdf";
 const DPI = 300;
 const MM_PER_INCH = 25.4;
 const MM_TO_PX_AT_300_DPI = DPI / MM_PER_INCH;
+// 1 pt = 1/72 inch = 25.4/72 mm ≈ 0.3528 mm, so 0.5pt ≈ 0.1764 mm
+const CUT_LINE_WIDTH_MM = (0.5 * MM_PER_INCH) / 72;
 
 /**
  * Render the Page document (artboard + elements) into a PDF at exactly 300 DPI.
@@ -50,6 +52,14 @@ export async function generatePagePDF({ artboard, elements }) {
       undefined,
       format === "PNG" ? "FAST" : "NONE"
     );
+    if (el.cutLine) {
+      // Stroke a hairline rectangle on the element's footprint. The stroke is
+      // centered on the path in PDF, so the visible frame lands exactly on the
+      // element's boundary (matching the dashed overlay shown in the editor).
+      pdf.setLineWidth(CUT_LINE_WIDTH_MM);
+      pdf.setDrawColor(0, 0, 0);
+      pdf.rect(el.x, el.y, el.width, el.height, "S");
+    }
   }
 
   const pdfBytes = pdf.output("arraybuffer");
