@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FiCreditCard, FiGrid, FiImage, FiSearch, FiShield, FiSmile, FiZap } from "react-icons/fi";
+import { FiCreditCard, FiFileText, FiGrid, FiImage, FiSearch, FiShield, FiSmile, FiZap } from "react-icons/fi";
 import HexagonalBackground from "@/app/components/HexagonalBackground";
 
 function getSiteUrl() {
@@ -50,6 +50,15 @@ const TOOLS = [
     icon: FiGrid,
     category: "layouts",
     iconClass: "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25",
+  },
+  {
+    href: "/page",
+    label: "Page",
+    description:
+      "Create a custom-sized artboard, drop images onto it, and arrange them freely. A freeform layout canvas with drag-and-resize elements.",
+    icon: FiFileText,
+    category: "layouts",
+    iconClass: "bg-indigo-500/15 text-indigo-400 ring-1 ring-indigo-500/25",
   },
   {
     href: "/file-inspector",
