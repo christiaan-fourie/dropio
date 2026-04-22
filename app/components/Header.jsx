@@ -15,6 +15,7 @@ const TOOL_LINKS = [
   { href: "/business-cards", label: "Business Cards (For networking, duh)" },
   { href: "/canvas-wrap", label: "Canvas Wrap (Art attack!)" },
   { href: "/custom-layout", label: "Custom Layout (Go wild)" },
+  { href: "/page", label: "Page (Drop & arrange)" },
   { href: "/file-inspector", label: "File inspector (What is this thing?)" },
 ];
 
