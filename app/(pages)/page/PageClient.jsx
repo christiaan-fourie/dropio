@@ -413,11 +413,12 @@ export default function PageClient() {
 
   return (
     <div className="p-6 text-zinc-100">
-      <Heading
+      {/* <Heading
+ 
         icon={FiFileText}
         title="Page"
         description="Create a page at any size, drop images onto the artboard, and arrange them freely. The document is a JSON model of an artboard and layered elements with position and size."
-      />
+      /> */}
 
       <Editor
         artboard={artboard}
