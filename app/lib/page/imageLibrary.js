@@ -30,10 +30,6 @@ export async function createLibraryItemFromFile(file, trackBlobUrl) {
   };
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
 export function createElementFromLibraryItem(item, board, layer, makeElementId, position) {
   const ratio = item.naturalWidth / item.naturalHeight || 1;
   let width = Math.min(board.width * 0.4, 120);
@@ -47,11 +43,9 @@ export function createElementFromLibraryItem(item, board, layer, makeElementId, 
   if (position) {
     x = position.x - width / 2;
     y = position.y - height / 2;
-    x = clamp(x, 0, board.width - width);
-    y = clamp(y, 0, board.height - height);
   } else {
-    x = clamp((board.width - width) / 2, 0, board.width - width);
-    y = clamp((board.height - height) / 2, 0, board.height - height);
+    x = (board.width - width) / 2;
+    y = (board.height - height) / 2;
   }
 
   return {

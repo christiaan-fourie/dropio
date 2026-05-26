@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { drawShapeOnPdf } from "../page/shapes";
 
 const DPI = 300;
 const MM_PER_INCH = 25.4;
@@ -38,6 +39,15 @@ export async function generatePagePDF({ artboard, elements }) {
   const ordered = [...(elements || [])].sort((a, b) => a.layer - b.layer);
 
   for (const el of ordered) {
+    if (el.type === "shape") {
+      drawShapeOnPdf(pdf, el);
+      if (el.cutLine) {
+        pdf.setLineWidth(CUT_LINE_WIDTH_MM);
+        pdf.setDrawColor(0, 0, 0);
+        pdf.rect(el.x, el.y, el.width, el.height, "S");
+      }
+      continue;
+    }
     if (el.type !== "image" || !el.src) continue;
     const targetPxW = Math.max(1, Math.round(el.width * MM_TO_PX_AT_300_DPI));
     const targetPxH = Math.max(1, Math.round(el.height * MM_TO_PX_AT_300_DPI));

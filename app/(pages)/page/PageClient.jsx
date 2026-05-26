@@ -30,6 +30,7 @@ import {
   FiLock,
   FiUnlock,
   FiMaximize2,
+  FiHexagon,
 } from "react-icons/fi";
 import { FaGithub } from "react-icons/fa6";
 import ThemeToggle from "@/app/components/ThemeToggle";
@@ -55,28 +56,47 @@ import {
   createLibraryItemFromFile,
   isSrcInUse,
 } from "@/app/lib/page/imageLibrary";
+import { SHAPE_CATALOG, createShapeElement } from "@/app/lib/page/shapes";
 
 /**
  * Document shape (source of truth for the tool):
  *
  * {
  *   artboard: { name: string, width: number, height: number, unit: "mm" },
- *   elements: Array<{
- *     id: string,
- *     type: "image",
- *     src: string,           // object URL (may be shared across duplicates/paste)
- *     libraryId?: string,    // link to a persisted library item
- *     name: string,
- *     naturalWidth: number,  // px
- *     naturalHeight: number, // px
- *     x: number,             // mm, top-left corner on artboard
- *     y: number,             // mm
- *     width: number,         // mm
- *     height: number,        // mm
- *     layer: number,         // stacking order; higher renders on top
- *     cutLine?: boolean,     // when true, a 0.5pt cutting line is stroked around the element
- *     lockAspectRatio?: boolean, // when true, resize and size fields keep width:height fixed
- *   }>
+ *   elements: Array<
+ *     | {
+ *         id: string,
+ *         type: "image",
+ *         src: string,           // object URL (may be shared across duplicates/paste)
+ *         libraryId?: string,    // link to a persisted library item
+ *         name: string,
+ *         naturalWidth: number,  // px
+ *         naturalHeight: number, // px
+ *         x: number,             // mm, top-left corner on artboard
+ *         y: number,             // mm
+ *         width: number,         // mm
+ *         height: number,        // mm
+ *         layer: number,         // stacking order; higher renders on top
+ *         cutLine?: boolean,     // when true, a 0.5pt cutting line is stroked around the element
+ *         lockAspectRatio?: boolean, // when true, resize and size fields keep width:height fixed
+ *       }
+ *     | {
+ *         id: string,
+ *         type: "shape",
+ *         shapeKind: "rectangle" | "ellipse" | "line",
+ *         name: string,
+ *         x: number,
+ *         y: number,
+ *         width: number,
+ *         height: number,
+ *         layer: number,
+ *         fill: string,
+ *         stroke: string,
+ *         strokeWidth: number,   // mm
+ *         cutLine?: boolean,
+ *         lockAspectRatio?: boolean,
+ *       }
+ *   >
  * }
  *
  * Selection is a list of ids (selectedIds). All drag / copy / delete /
@@ -183,27 +203,26 @@ function sortElementsReadingOrder(elements) {
   });
 }
 
-function resizeBoxWithLockedAspect(origin, dxMm, dyMm, board) {
+function resizeBoxWithLockedAspect(origin, dxMm, dyMm) {
   const ratio = origin.width / origin.height || 1;
   const scaleX = (origin.width + dxMm) / origin.width;
   const scaleY = (origin.height + dyMm) / origin.height;
   const scale = Math.max(scaleX, scaleY, 5 / origin.width, 5 / origin.height);
   let width = origin.width * scale;
   let height = origin.height * scale;
-  const maxW = Math.max(5, board.width - origin.x);
-  const maxH = Math.max(5, board.height - origin.y);
-  width = clamp(width, 5, maxW);
+  width = Math.max(5, width);
+  height = Math.max(5, height);
   height = width / ratio;
-  if (height > maxH) {
-    height = maxH;
+  if (height < 5) {
+    height = 5;
     width = height * ratio;
   }
-  width = clamp(width, 5, maxW);
-  height = clamp(height, 5, maxH);
+  width = Math.max(5, width);
+  height = Math.max(5, height);
   return { width, height };
 }
 
-function resizeBoxLockedFromAnchor(origin, dxMm, dyMm, mode, board) {
+function resizeBoxLockedFromAnchor(origin, dxMm, dyMm, mode) {
   const ratio = origin.width / origin.height || 1;
   const minSize = 5;
 
@@ -247,32 +266,8 @@ function resizeBoxLockedFromAnchor(origin, dxMm, dyMm, mode, board) {
     width = height * ratio;
   }
 
-  // Clamp within the artboard based on which corner is fixed.
-  let maxW;
-  let maxH;
-  if (mode === "resize-se") {
-    maxW = Math.max(minSize, board.width - anchorX);
-    maxH = Math.max(minSize, board.height - anchorY);
-  } else if (mode === "resize-nw") {
-    maxW = Math.max(minSize, anchorX);
-    maxH = Math.max(minSize, anchorY);
-  } else if (mode === "resize-ne") {
-    maxW = Math.max(minSize, board.width - anchorX);
-    maxH = Math.max(minSize, anchorY);
-  } else {
-    // resize-sw
-    maxW = Math.max(minSize, anchorX);
-    maxH = Math.max(minSize, board.height - anchorY);
-  }
-
-  width = clamp(width, minSize, maxW);
-  height = width / ratio;
-  if (height > maxH) {
-    height = maxH;
-    width = height * ratio;
-  }
-  width = clamp(width, minSize, maxW);
-  height = clamp(height, minSize, maxH);
+  width = Math.max(minSize, width);
+  height = Math.max(minSize, height);
 
   if (mode === "resize-se") {
     return { x: anchorX, y: anchorY, width, height };
@@ -347,20 +342,17 @@ function resizeOverridesAspectLock(mode, shiftKey) {
   return shiftKey && CORNER_RESIZE_MODES.has(mode);
 }
 
-function computeResizedBox(origin, dxMm, dyMm, mode, board, { lockAspectRatio = false } = {}) {
+function computeResizedBox(origin, dxMm, dyMm, mode, _board, { lockAspectRatio = false } = {}) {
   if (lockAspectRatio && CORNER_RESIZE_MODES.has(mode)) {
-    return resizeBoxLockedFromAnchor(origin, dxMm, dyMm, mode, board);
+    return resizeBoxLockedFromAnchor(origin, dxMm, dyMm, mode);
   }
   if (mode === "resize-se") {
-    const box = {
+    return {
       x: origin.x,
       y: origin.y,
-      width: origin.width + dxMm,
-      height: origin.height + dyMm,
+      width: Math.max(5, origin.width + dxMm),
+      height: Math.max(5, origin.height + dyMm),
     };
-    box.width = clamp(box.width, 5, Math.max(5, board.width - box.x));
-    box.height = clamp(box.height, 5, Math.max(5, board.height - box.y));
-    return box;
   }
   if (mode === "resize-nw") {
     const box = {
@@ -369,10 +361,10 @@ function computeResizedBox(origin, dxMm, dyMm, mode, board, { lockAspectRatio = 
       width: origin.width - dxMm,
       height: origin.height - dyMm,
     };
-    box.x = clamp(box.x, 0, origin.x + origin.width - 5);
-    box.y = clamp(box.y, 0, origin.y + origin.height - 5);
-    box.width = clamp(box.width, 5, origin.x + origin.width - box.x);
-    box.height = clamp(box.height, 5, origin.y + origin.height - box.y);
+    box.x = Math.min(box.x, origin.x + origin.width - 5);
+    box.y = Math.min(box.y, origin.y + origin.height - 5);
+    box.width = Math.max(5, origin.x + origin.width - box.x);
+    box.height = Math.max(5, origin.y + origin.height - box.y);
     return box;
   }
   if (mode === "resize-ne") {
@@ -382,9 +374,9 @@ function computeResizedBox(origin, dxMm, dyMm, mode, board, { lockAspectRatio = 
       width: origin.width + dxMm,
       height: origin.height - dyMm,
     };
-    box.width = clamp(box.width, 5, Math.max(5, board.width - box.x));
-    box.y = clamp(box.y, 0, origin.y + origin.height - 5);
-    box.height = clamp(box.height, 5, origin.y + origin.height - box.y);
+    box.width = Math.max(5, box.width);
+    box.y = Math.min(box.y, origin.y + origin.height - 5);
+    box.height = Math.max(5, origin.y + origin.height - box.y);
     return box;
   }
   if (mode === "resize-sw") {
@@ -394,37 +386,33 @@ function computeResizedBox(origin, dxMm, dyMm, mode, board, { lockAspectRatio = 
       width: origin.width - dxMm,
       height: origin.height + dyMm,
     };
-    box.x = clamp(box.x, 0, origin.x + origin.width - 5);
-    box.width = clamp(box.width, 5, origin.x + origin.width - box.x);
-    box.height = clamp(box.height, 5, Math.max(5, board.height - box.y));
+    box.x = Math.min(box.x, origin.x + origin.width - 5);
+    box.width = Math.max(5, origin.x + origin.width - box.x);
+    box.height = Math.max(5, box.height);
     return box;
   }
   if (mode === "resize-e") {
-    const box = { x: origin.x, y: origin.y, width: origin.width + dxMm, height: origin.height };
-    box.width = clamp(box.width, 5, Math.max(5, board.width - box.x));
-    return box;
+    return { x: origin.x, y: origin.y, width: Math.max(5, origin.width + dxMm), height: origin.height };
   }
   if (mode === "resize-w") {
     const box = { x: origin.x + dxMm, y: origin.y, width: origin.width - dxMm, height: origin.height };
-    box.x = clamp(box.x, 0, origin.x + origin.width - 5);
-    box.width = clamp(box.width, 5, origin.x + origin.width - box.x);
+    box.x = Math.min(box.x, origin.x + origin.width - 5);
+    box.width = Math.max(5, origin.x + origin.width - box.x);
     return box;
   }
   if (mode === "resize-s") {
-    const box = { x: origin.x, y: origin.y, width: origin.width, height: origin.height + dyMm };
-    box.height = clamp(box.height, 5, Math.max(5, board.height - box.y));
-    return box;
+    return { x: origin.x, y: origin.y, width: origin.width, height: Math.max(5, origin.height + dyMm) };
   }
   if (mode === "resize-n") {
     const box = { x: origin.x, y: origin.y + dyMm, width: origin.width, height: origin.height - dyMm };
-    box.y = clamp(box.y, 0, origin.y + origin.height - 5);
-    box.height = clamp(box.height, 5, origin.y + origin.height - box.y);
+    box.y = Math.min(box.y, origin.y + origin.height - 5);
+    box.height = Math.max(5, origin.y + origin.height - box.y);
     return box;
   }
   return { x: origin.x, y: origin.y, width: origin.width, height: origin.height };
 }
 
-function patchSizeKeepingAspect(element, patch, board) {
+function patchSizeKeepingAspect(element, patch, _board) {
   if (!element.lockAspectRatio) return patch;
   const ratio = elementAspectRatio(element);
   const next = { ...element, ...patch };
@@ -440,11 +428,11 @@ function patchSizeKeepingAspect(element, patch, board) {
     return patch;
   }
   if (patch.width != null && patch.height == null) {
-    next.height = clamp(next.width / ratio, 5, Math.max(5, board.height - next.y));
-    next.width = clamp(next.height * ratio, 5, Math.max(5, board.width - next.x));
+    next.height = Math.max(5, next.width / ratio);
+    next.width = Math.max(5, next.height * ratio);
   } else if (patch.height != null && patch.width == null) {
-    next.width = clamp(next.height * ratio, 5, Math.max(5, board.width - next.x));
-    next.height = clamp(next.width / ratio, 5, Math.max(5, board.height - next.y));
+    next.width = Math.max(5, next.height * ratio);
+    next.height = Math.max(5, next.width / ratio);
   }
   return { width: next.width, height: next.height };
 }
@@ -943,6 +931,22 @@ export default function PageClient({ initialViewMode = "editor" }) {
     [addToLibrary, placeLibraryItems]
   );
 
+  const addShape = useCallback(
+    (shapeKind) => {
+      if (!artboardRef.current) return;
+      const board = artboardRef.current;
+      pushUndoSnapshot();
+      let placed = null;
+      setElements((prev) => {
+        const layer = prev.length === 0 ? 0 : Math.max(...prev.map((e) => e.layer)) + 1;
+        placed = createShapeElement(shapeKind, board, layer, makeId);
+        return [...prev, placed];
+      });
+      if (placed) setSelectedIds([placed.id]);
+    },
+    [pushUndoSnapshot]
+  );
+
   const patchElement = useCallback((id, patch) => {
     setElements((prev) => prev.map((el) => (el.id === id ? { ...el, ...patch } : el)));
   }, []);
@@ -973,13 +977,12 @@ export default function PageClient({ initialViewMode = "editor" }) {
     [pushUndoSnapshot]
   );
 
-  /** Set every selected image to the same width and/or height (mm), clamped per element. */
+  /** Set every selected element to the same width and/or height (mm). */
   const resizeSelectedToUniformSize = useCallback(
     (patch) => {
       const ids = selectedIdsRef.current;
       if (ids.length === 0) return;
       if (patch.width == null && patch.height == null) return;
-      const board = artboardRef.current;
       pushUndoSnapshot();
       const idSet = new Set(ids);
       setElements((prev) =>
@@ -987,10 +990,10 @@ export default function PageClient({ initialViewMode = "editor" }) {
           if (!idSet.has(el.id)) return el;
           const next = { ...el };
           if (patch.width != null) {
-            next.width = clamp(patch.width, 5, Math.max(5, board.width - el.x));
+            next.width = Math.max(5, patch.width);
           }
           if (patch.height != null) {
-            next.height = clamp(patch.height, 5, Math.max(5, board.height - el.y));
+            next.height = Math.max(5, patch.height);
           }
           return next;
         })
@@ -1176,18 +1179,14 @@ export default function PageClient({ initialViewMode = "editor" }) {
 
   /**
    * Insert a copy of the given source element. Returns the new id.
-   * `offsetMm` is applied to x/y and clamped to the artboard. Pass 0 for
-   * Alt-drag (clone stays at the source position while the drag moves the
-   * original away) and a non-zero value for keyboard paste.
+   * `offsetMm` is applied to x/y. Pass 0 for Alt-drag (clone stays at the source
+   * position while the drag moves the original away) and a non-zero value for keyboard paste.
    */
   const insertCopy = useCallback((source, offsetMm = 0) => {
-    const board = artboardRef.current;
-    if (!board || !source) return null;
+    if (!source) return null;
     const newId = makeId();
-    const maxW = Math.max(1, board.width - source.width);
-    const maxH = Math.max(1, board.height - source.height);
-    const nx = clamp(source.x + offsetMm, 0, maxW);
-    const ny = clamp(source.y + offsetMm, 0, maxH);
+    const nx = source.x + offsetMm;
+    const ny = source.y + offsetMm;
     setElements((prev) => {
       const topLayer = prev.length === 0 ? 0 : Math.max(...prev.map((e) => e.layer)) + 1;
       return [
@@ -1524,6 +1523,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
         selectedIds={selectedIds}
         setSelectedIds={setSelectedIds}
         addImagesFromFiles={addImagesFromFiles}
+        addShape={addShape}
         uploadToLibrary={uploadToLibrary}
         placeFromLibrary={placeFromLibrary}
         removeFromLibrary={removeFromLibrary}
@@ -1581,6 +1581,7 @@ function Editor({
   selectedIds,
   setSelectedIds,
   addImagesFromFiles,
+  addShape,
   uploadToLibrary,
   placeFromLibrary,
   removeFromLibrary,
@@ -1864,6 +1865,35 @@ function Editor({
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </AccordionSection>
+
+        <AccordionSection
+          id="shapes"
+          title="Shapes"
+          icon={FiHexagon}
+          open={activePanel === "shapes"}
+          onToggle={setActivePanel}
+          summary="Rectangles, ellipses & lines"
+        >
+          <div className="space-y-3 neu-panel rounded-[var(--radius)] p-3">
+            <p className="text-[11px] leading-relaxed neu-text-muted">
+              Add vector shapes to the artboard. Adjust fill, stroke, and size in the properties panel.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {SHAPE_CATALOG.map((shape) => (
+                <button
+                  key={shape.kind}
+                  type="button"
+                  onClick={() => addShape(shape.kind)}
+                  className="neu-btn flex flex-col items-center gap-1.5 rounded-[var(--radius-sm)] px-2 py-2.5 text-[10px] font-semibold transition"
+                  title={`Add ${shape.label}`}
+                >
+                  <ShapePreviewIcon shape={shape} className="h-8 w-8" />
+                  {shape.label}
+                </button>
+              ))}
             </div>
           </div>
         </AccordionSection>
@@ -2322,6 +2352,120 @@ function StageToolbar({
   );
 }
 
+function ShapePreviewIcon({ shape, className = "" }) {
+  const fill = shape.fill === "transparent" ? "none" : shape.fill;
+  const stroke = shape.stroke;
+  const strokeWidth = 1.5;
+
+  if (shape.kind === "line") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden>
+        <line x1="3" y1="12" x2="21" y2="12" stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (shape.kind === "ellipse") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden>
+        <ellipse cx="12" cy="12" rx="9" ry="9" fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <rect x="4" y="6" width="16" height="12" rx="1" fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+    </svg>
+  );
+}
+
+function ShapeElementGraphic({ element }) {
+  const fill = element.fill === "transparent" ? "none" : element.fill;
+  const stroke = element.stroke || "#000000";
+  const strokeWidth = element.strokeWidth ?? 0.5;
+  const viewW = Math.max(element.width, 1);
+  const viewH = Math.max(element.height, 1);
+
+  return (
+    <svg
+      width="100%"
+      height="100%"
+      viewBox={`0 0 ${viewW} ${viewH}`}
+      preserveAspectRatio="none"
+      aria-hidden
+      style={{ display: "block", pointerEvents: "none" }}
+    >
+      {element.shapeKind === "line" ? (
+        <line
+          x1="0"
+          y1={viewH / 2}
+          x2={viewW}
+          y2={viewH / 2}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      ) : element.shapeKind === "ellipse" ? (
+        <ellipse
+          cx={viewW / 2}
+          cy={viewH / 2}
+          rx={viewW / 2}
+          ry={viewH / 2}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          vectorEffect="non-scaling-stroke"
+        />
+      ) : (
+        <rect
+          x={strokeWidth / 2}
+          y={strokeWidth / 2}
+          width={Math.max(0, viewW - strokeWidth)}
+          height={Math.max(0, viewH - strokeWidth)}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+    </svg>
+  );
+}
+
+function ColorField({ uiScale, label, value, onChange, allowTransparent = true }) {
+  const swatch = value === "transparent" ? "transparent" : value || "#000000";
+  return (
+    <label
+      className="block font-medium neu-text-muted"
+      style={{ fontSize: uiScale * 2.8 }}
+    >
+      {label}
+      <div className="mt-1 flex items-center gap-2">
+        <input
+          type="color"
+          value={swatch === "transparent" ? "#ffffff" : swatch}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-8 w-10 shrink-0 cursor-pointer rounded-[var(--radius-sm)] border border-[var(--border)] bg-transparent p-0.5"
+          aria-label={`${label} color`}
+        />
+        {allowTransparent ? (
+          <button
+            type="button"
+            onClick={() => onChange(value === "transparent" ? "#000000" : "transparent")}
+            className={`neu-btn flex-1 px-2 py-1.5 text-[10px] font-semibold ${value === "transparent" ? "neu-chip-active" : ""}`}
+          >
+            {value === "transparent" ? "Transparent" : "Set transparent"}
+          </button>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-[10px] tabular-nums neu-text-muted">{swatch}</span>
+        )}
+      </div>
+    </label>
+  );
+}
+
 function SidebarGroup({ label, children }) {
   return (
     <div className="space-y-2">
@@ -2393,8 +2537,8 @@ function ElementProperties({ element, artboard, onChange, onReorder, onDelete, u
     const ratio = element.naturalWidth && element.naturalHeight
       ? element.naturalWidth / Math.max(1e-6, element.naturalHeight)
       : baseRatio;
-    const nextHeight = clamp(element.width / Math.max(1e-6, ratio), 5, Math.max(5, artboard.height - element.y));
-    const nextWidth = clamp(nextHeight * ratio, 5, Math.max(5, artboard.width - element.x));
+    const nextHeight = Math.max(5, element.width / Math.max(1e-6, ratio));
+    const nextWidth = Math.max(5, nextHeight * ratio);
     onChange({
       width: nextWidth,
       height: nextHeight,
@@ -2405,6 +2549,32 @@ function ElementProperties({ element, artboard, onChange, onReorder, onDelete, u
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: sectionGap }}>
+      {element.type === "shape" ? (
+        <>
+          <ColorField
+            uiScale={uiScale}
+            label="Fill"
+            value={element.fill}
+            onChange={(fill) => onChange({ fill })}
+            allowTransparent={element.shapeKind !== "line"}
+          />
+          <ColorField
+            uiScale={uiScale}
+            label="Stroke"
+            value={element.stroke}
+            onChange={(stroke) => onChange({ stroke })}
+            allowTransparent={false}
+          />
+          <NumField
+            uiScale={uiScale}
+            label="Stroke width (mm)"
+            value={element.strokeWidth ?? 0.5}
+            min={0}
+            onChange={(v) => onChange({ strokeWidth: Math.max(0, v) })}
+          />
+        </>
+      ) : null}
+
       <div className="grid grid-cols-2" style={{ gap }}>
         <NumField
           uiScale={uiScale}
@@ -2428,7 +2598,11 @@ function ElementProperties({ element, artboard, onChange, onReorder, onDelete, u
           onClick={handleResetRatio}
           className="neu-btn inline-flex w-full items-center justify-center font-medium"
           style={ctrl}
-          title="Reset the image back to its original aspect ratio"
+          title={
+            element.type === "image"
+              ? "Reset the image back to its original aspect ratio"
+              : "Reset to the current aspect ratio"
+          }
         >
           Reset ratio
         </button>
@@ -3421,20 +3595,10 @@ function ArtboardStage({
     // move — possibly a group drag
     const { ids, origins, primaryId } = d;
 
-    // Clamp the delta so no element leaves the artboard.
     let cdx = dxMm;
     let cdy = dyMm;
-    for (const aid of ids) {
-      const o = origins[aid];
-      cdx = Math.max(cdx, -o.x);
-      cdx = Math.min(cdx, board.width - o.x - o.width);
-      cdy = Math.max(cdy, -o.y);
-      cdy = Math.min(cdy, board.height - o.y - o.height);
-    }
 
-    // Snap using the primary (grabbed) element's bounds; others follow by
-    // the same delta. Re-clamp afterwards to keep everything in bounds even
-    // if snap tries to push the group slightly past an edge.
+    // Snap using the primary (grabbed) element's bounds; others follow by the same delta.
     let guideLines = { xs: [], ys: [] };
     if (snapEnabledRef.current) {
       const prim = origins[primaryId];
@@ -3452,13 +3616,6 @@ function ArtboardStage({
         guideLines = res.guides;
         cdx = res.box.x - prim.x;
         cdy = res.box.y - prim.y;
-        for (const aid of ids) {
-          const o = origins[aid];
-          cdx = Math.max(cdx, -o.x);
-          cdx = Math.min(cdx, board.width - o.x - o.width);
-          cdy = Math.max(cdy, -o.y);
-          cdy = Math.min(cdy, board.height - o.y - o.height);
-        }
       }
     }
     setGuides(guideLines);
@@ -3705,14 +3862,19 @@ function ArtboardStage({
       >
         <div
           ref={boardRef}
-          className="relative rounded-sm neu-artboard-shadow"
+          className="relative"
           style={{
             width: boardPxW,
             height: boardPxH,
-            ...artboardSurfaceStyles(artboard),
             touchAction: "none",
+            overflow: "visible",
           }}
         >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-sm neu-artboard-shadow"
+            style={artboardSurfaceStyles(artboard)}
+          />
           {elements.map((el) => (
             <ElementView
               key={el.id}
@@ -4518,7 +4680,9 @@ function ElementView({
         ...selectionStyle,
       }}
     >
-      {element.type === "image" ? (
+      {element.type === "shape" ? (
+        <ShapeElementGraphic element={element} />
+      ) : element.type === "image" ? (
         <img
           src={element.src}
           alt={element.name}

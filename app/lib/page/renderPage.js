@@ -1,3 +1,5 @@
+import { drawShapeOnCanvas2d } from "./shapes";
+
 const DEFAULT_DPI = 300;
 const MM_PER_INCH = 25.4;
 
@@ -45,6 +47,17 @@ export async function renderPageToCanvas({ artboard, elements, dpi = DEFAULT_DPI
 
   const ordered = [...(elements || [])].sort((a, b) => a.layer - b.layer);
   for (const el of ordered) {
+    if (el.type === "shape") {
+      drawShapeOnCanvas2d(ctx, el, scale);
+      if (el.cutLine) {
+        ctx.save();
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = Math.max(1, Math.round((0.5 / 72) * dpi));
+        ctx.strokeRect(el.x * scale, el.y * scale, el.width * scale, el.height * scale);
+        ctx.restore();
+      }
+      continue;
+    }
     if (el.type !== "image" || !el.src) continue;
     const img = await loadImage(el.src);
     ctx.drawImage(
