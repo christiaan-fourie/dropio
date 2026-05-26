@@ -170,9 +170,8 @@ export async function buildPersistedSnapshot(snapshotInput) {
     library,
     snapEnabled,
     businessSheet,
-    gridRows,
-    gridCols,
-    gridGap,
+    layoutGap,
+    layoutLockAspect,
     viewport,
     canvasWrap,
   } = snapshotInput;
@@ -184,9 +183,8 @@ export async function buildPersistedSnapshot(snapshotInput) {
     library,
     snapEnabled,
     businessSheet,
-    gridRows,
-    gridCols,
-    gridGap,
+    layoutGap,
+    layoutLockAspect,
     viewport: viewport ?? DEFAULT_VIEWPORT,
     canvasWrap,
   });
@@ -254,9 +252,8 @@ export function readInitialEditorState(initialViewMode) {
     library,
     snapEnabled: stored?.snapEnabled ?? true,
     businessSheet: stored?.businessSheet ?? "A4",
-    gridRows: stored?.gridRows ?? 3,
-    gridCols: stored?.gridCols ?? 2,
-    gridGap: stored?.gridGap ?? 2,
+    layoutGap: stored?.layoutGap ?? stored?.gridGap ?? 2,
+    layoutLockAspect: stored?.layoutLockAspect ?? true,
     viewport: stored?.viewport ?? DEFAULT_VIEWPORT,
     canvasWrapMeta: stored?.canvasWrap
       ? {

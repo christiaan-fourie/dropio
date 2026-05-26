@@ -29,6 +29,7 @@ import {
   FiX,
   FiLock,
   FiUnlock,
+  FiMaximize2,
 } from "react-icons/fi";
 import { FaGithub } from "react-icons/fa6";
 import ThemeToggle from "@/app/components/ThemeToggle";
@@ -133,6 +134,53 @@ function clamp(v, min, max) {
 function elementAspectRatio(element) {
   if (!element?.height) return 1;
   return element.width / element.height;
+}
+
+const N_UP_COUNTS = [1, 2, 3, 4, 6, 8, 9, 12];
+
+function layoutSourceElement(elements, selectedIds) {
+  return elements.find((el) => selectedIds.includes(el.id)) || elements[0] || null;
+}
+
+/** Pick rows×cols that best matches artboard aspect for `count` copies. */
+function bestGridForCount(count, boardWidth, boardHeight) {
+  const boardAspect = boardWidth / boardHeight;
+  let best = { rows: 1, cols: count, score: Infinity };
+  for (let rows = 1; rows <= count; rows++) {
+    const cols = Math.ceil(count / rows);
+    const gridAspect = cols / rows;
+    const aspectDiff = Math.abs(gridAspect - boardAspect);
+    const waste = rows * cols - count;
+    const score = waste * 100 + aspectDiff;
+    if (score < best.score) best = { rows, cols, score };
+  }
+  return { rows: best.rows, cols: best.cols };
+}
+
+function fitInCell(cellW, cellH, element, lockAspect) {
+  if (!lockAspect) {
+    return { width: cellW, height: cellH };
+  }
+  const ratio = elementAspectRatio(element);
+  let width = cellW;
+  let height = width / ratio;
+  if (height > cellH) {
+    height = cellH;
+    width = height * ratio;
+  }
+  return { width, height };
+}
+
+function sortElementsReadingOrder(elements) {
+  if (elements.length <= 1) return [...elements];
+  const maxH = Math.max(...elements.map((e) => e.height));
+  const band = Math.max(1, maxH / 2);
+  return [...elements].sort((a, b) => {
+    const ay = Math.round(a.y / band);
+    const by = Math.round(b.y / band);
+    if (ay !== by) return ay - by;
+    return a.x - b.x;
+  });
 }
 
 function resizeBoxWithLockedAspect(origin, dxMm, dyMm, board) {
@@ -432,9 +480,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [businessSheet, setBusinessSheet] = useState("A4");
-  const [gridRows, setGridRows] = useState(3);
-  const [gridCols, setGridCols] = useState(2);
-  const [gridGap, setGridGap] = useState(2);
+  const [layoutGap, setLayoutGap] = useState(2);
+  const [layoutLockAspect, setLayoutLockAspect] = useState(true);
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
   const [canvasWrap, setCanvasWrap] = useState(() => ({ ...DEFAULT_CANVAS_WRAP, files: [] }));
   const [persistReady, setPersistReady] = useState(false);
@@ -565,9 +612,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
       setLibrary(hydratedLibrary);
       setSnapEnabled(boot.snapEnabled);
       setBusinessSheet(boot.businessSheet);
-      setGridRows(boot.gridRows);
-      setGridCols(boot.gridCols);
-      setGridGap(boot.gridGap);
+      setLayoutGap(boot.layoutGap ?? boot.gridGap ?? 2);
+      setLayoutLockAspect(boot.layoutLockAspect ?? true);
       setViewport(boot.viewport ?? DEFAULT_VIEWPORT);
       if (initialViewMode !== "canvas-wrap" && boot.viewMode) {
         setViewMode(boot.viewMode);
@@ -609,9 +655,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
         library,
         snapEnabled,
         businessSheet,
-        gridRows,
-        gridCols,
-        gridGap,
+        layoutGap,
+        layoutLockAspect,
         viewport,
         canvasWrap,
       });
@@ -625,9 +670,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
     library,
     snapEnabled,
     businessSheet,
-    gridRows,
-    gridCols,
-    gridGap,
+    layoutGap,
+    layoutLockAspect,
     viewport,
     canvasWrap,
   ]);
@@ -1252,61 +1296,136 @@ export default function PageClient({ initialViewMode = "editor" }) {
     setSelectedIds(arranged.map((el) => el.id));
   }, [businessSheet, pushUndoSnapshot]);
 
-  const applyGridLayout = useCallback(() => {
-    const board = artboardRef.current;
-    const rows = clamp(Math.round(Number(gridRows) || 1), 1, 20);
-    const cols = clamp(Math.round(Number(gridCols) || 1), 1, 20);
-    const gap = clamp(Number(gridGap) || 0, 0, 100);
-    const source =
-      elementsRef.current.find((el) => selectedIdsRef.current.includes(el.id)) ||
-      elementsRef.current[0];
+  const applyNUpLayout = useCallback(
+    (count) => {
+      const board = artboardRef.current;
+      const n = clamp(Math.round(Number(count) || 1), 1, 50);
+      const gap = clamp(Number(layoutGap) || 0, 0, 100);
+      const lockAspect = layoutLockAspect;
+      const source = layoutSourceElement(elementsRef.current, selectedIdsRef.current);
 
-    if (!source) {
-      alert("Add or select artwork before creating a grid.");
-      return;
-    }
+      if (!source) {
+        alert("Add or select artwork first.");
+        return;
+      }
 
-    const cellWidth = (board.width - gap * (cols - 1)) / cols;
-    const cellHeight = (board.height - gap * (rows - 1)) / rows;
-    if (cellWidth <= 0 || cellHeight <= 0) {
-      alert("The gap is too large for this artboard and grid.");
-      return;
-    }
+      const { rows, cols } = bestGridForCount(n, board.width, board.height);
+      const cellW = (board.width - gap * (cols - 1)) / cols;
+      const cellH = (board.height - gap * (rows - 1)) / rows;
+      if (cellW <= 0 || cellH <= 0) {
+        alert("Gap is too large for this artboard.");
+        return;
+      }
 
-    const ratio = source.naturalWidth && source.naturalHeight
-      ? source.naturalWidth / source.naturalHeight
-      : source.width / source.height || 1;
-    const arranged = [];
-
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        let width = cellWidth;
-        let height = width / ratio;
-        if (height > cellHeight) {
-          height = cellHeight;
-          width = height * ratio;
-        }
-
+      const arranged = [];
+      for (let i = 0; i < n; i++) {
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        const { width, height } = fitInCell(cellW, cellH, source, lockAspect);
         arranged.push({
           ...source,
           id: makeId(),
-          x: col * (cellWidth + gap) + (cellWidth - width) / 2,
-          y: row * (cellHeight + gap) + (cellHeight - height) / 2,
+          x: col * (cellW + gap) + (cellW - width) / 2,
+          y: row * (cellH + gap) + (cellH - height) / 2,
           width,
           height,
           layer: arranged.length,
+          lockAspectRatio: lockAspect ? true : source.lockAspectRatio,
+        });
+      }
+
+      pushUndoSnapshot();
+      setArtboard({
+        ...board,
+        name: n === 1 ? source.name || "1-up" : `${n}-up`,
+      });
+      setElements(arranged);
+      setSelectedIds(arranged.map((el) => el.id));
+    },
+    [layoutGap, layoutLockAspect, pushUndoSnapshot]
+  );
+
+  const applyFillPage = useCallback(() => {
+    const board = artboardRef.current;
+    const gap = clamp(Number(layoutGap) || 0, 0, 100);
+    const lockAspect = layoutLockAspect;
+    const source = layoutSourceElement(elementsRef.current, selectedIdsRef.current);
+
+    if (!source) {
+      alert("Add or select artwork first.");
+      return;
+    }
+
+    const tileW = source.width;
+    const tileH = source.height;
+    if (tileW <= 0 || tileH <= 0) return;
+
+    const cols = Math.max(1, Math.floor((board.width + gap) / (tileW + gap)));
+    const rows = Math.max(1, Math.floor((board.height + gap) / (tileH + gap)));
+    const totalW = cols * tileW + (cols - 1) * gap;
+    const totalH = rows * tileH + (rows - 1) * gap;
+    const startX = (board.width - totalW) / 2;
+    const startY = (board.height - totalH) / 2;
+
+    const arranged = [];
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        arranged.push({
+          ...source,
+          id: makeId(),
+          x: startX + col * (tileW + gap),
+          y: startY + row * (tileH + gap),
+          width: tileW,
+          height: tileH,
+          layer: arranged.length,
+          lockAspectRatio: lockAspect ? true : source.lockAspectRatio,
         });
       }
     }
 
     pushUndoSnapshot();
-    setArtboard({
-      ...board,
-      name: `${cols} x ${rows} grid`,
-    });
+    setArtboard({ ...board, name: "Fill page" });
     setElements(arranged);
     setSelectedIds(arranged.map((el) => el.id));
-  }, [gridCols, gridGap, gridRows, pushUndoSnapshot]);
+  }, [layoutGap, layoutLockAspect, pushUndoSnapshot]);
+
+  const applyBigAsPossible = useCallback(() => {
+    const board = artboardRef.current;
+    const gap = clamp(Number(layoutGap) || 0, 0, 100);
+    const lockAspect = layoutLockAspect;
+    const prev = elementsRef.current;
+
+    if (prev.length === 0) {
+      alert("Add images to the artboard first.");
+      return;
+    }
+
+    pushUndoSnapshot();
+    setElements(() => {
+      const sorted = sortElementsReadingOrder(prev);
+      const n = sorted.length;
+      const { rows, cols } = bestGridForCount(n, board.width, board.height);
+      const cellW = (board.width - gap * (cols - 1)) / cols;
+      const cellH = (board.height - gap * (rows - 1)) / rows;
+      if (cellW <= 0 || cellH <= 0) return prev;
+
+      const updates = new Map();
+      sorted.forEach((el, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const { width, height } = fitInCell(cellW, cellH, el, lockAspect);
+        updates.set(el.id, {
+          x: col * (cellW + gap) + (cellW - width) / 2,
+          y: row * (cellH + gap) + (cellH - height) / 2,
+          width,
+          height,
+          lockAspectRatio: lockAspect ? true : el.lockAspectRatio,
+        });
+      });
+
+      return prev.map((p) => (updates.has(p.id) ? { ...p, ...updates.get(p.id) } : p));
+    });
+  }, [layoutGap, layoutLockAspect, pushUndoSnapshot]);
 
   // Global shortcuts + paste (OS images and internal element clipboard). Ignored while typing.
   useEffect(() => {
@@ -1436,13 +1555,13 @@ export default function PageClient({ initialViewMode = "editor" }) {
         businessSheet={businessSheet}
         setBusinessSheet={setBusinessSheet}
         applyBusinessCardLayout={applyBusinessCardLayout}
-        gridRows={gridRows}
-        setGridRows={setGridRows}
-        gridCols={gridCols}
-        setGridCols={setGridCols}
-        gridGap={gridGap}
-        setGridGap={setGridGap}
-        applyGridLayout={applyGridLayout}
+        layoutGap={layoutGap}
+        setLayoutGap={setLayoutGap}
+        layoutLockAspect={layoutLockAspect}
+        setLayoutLockAspect={setLayoutLockAspect}
+        applyNUpLayout={applyNUpLayout}
+        applyFillPage={applyFillPage}
+        applyBigAsPossible={applyBigAsPossible}
         viewMode={viewMode}
         setViewMode={setViewMode}
         viewport={viewport}
@@ -1493,13 +1612,13 @@ function Editor({
   businessSheet,
   setBusinessSheet,
   applyBusinessCardLayout,
-  gridRows,
-  setGridRows,
-  gridCols,
-  setGridCols,
-  gridGap,
-  setGridGap,
-  applyGridLayout,
+  layoutGap,
+  setLayoutGap,
+  layoutLockAspect,
+  setLayoutLockAspect,
+  applyNUpLayout,
+  applyFillPage,
+  applyBigAsPossible,
   viewMode,
   setViewMode,
   viewport,
@@ -1579,311 +1698,367 @@ function Editor({
   }, [isCanvasMode]);
 
   const editorSidebarControls = (
-    <div className="space-y-4">
-      <button
-        type="button"
-        onClick={onReset}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-xs font-semibold neu-text-muted"
-      >
-        <FiRotateCw className="h-3.5 w-3.5" />
-        Reset
-      </button>
-
-      <AccordionSection
-        id="export"
-        title="Export"
-        icon={FiDownload}
-        open={activePanel === "export"}
-        onToggle={setActivePanel}
-        summary="PDF & PNG"
-      >
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={onDownloadPdf}
-            disabled={isExporting || elements.length === 0}
-            className="neu-btn-primary inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed"
-          >
-            {isExporting ? (
-              <>
-                <FiLoader className="h-4 w-4 animate-spin" />
-                Generating PDF…
-              </>
-            ) : (
-              <>
-                <FiDownload className="h-4 w-4" />
-                Export PDF
-              </>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={onDownloadPng}
-            disabled={isExportingPng || elements.length === 0}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed"
-          >
-            {isExportingPng ? (
-              <>
-                <FiLoader className="h-4 w-4 animate-spin" />
-                Generating PNG…
-              </>
-            ) : (
-              <>
-                <FiImage className="h-4 w-4" />
-                Export PNG
-              </>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={onPrint}
-            disabled={isPrinting}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed"
-          >
-            {isPrinting ? (
-              <>
-                <FiLoader className="h-4 w-4 animate-spin" />
-                Preparing print…
-              </>
-            ) : (
-              <>
-                <FiPrinter className="h-4 w-4" />
-                Print
-              </>
-            )}
-          </button>
-        </div>
-      </AccordionSection>
-
-      <AccordionSection
-        id="artboard"
-        title="Artboard"
-        icon={FiFileText}
-        open={activePanel === "artboard"}
-        onToggle={setActivePanel}
-        summary={`${artboard.width} x ${artboard.height} ${artboard.unit}`}
-      >
-        <label className="block text-[11px] font-medium neu-text-muted">
-          Name
-          <input
-            type="text"
-            value={artboard.name}
-            onChange={(e) => setArtboard({ ...artboard, name: e.target.value })}
-            className={`${inputClass} mt-1 py-1.5 text-xs`}
-          />
-        </label>
-        <div className="rounded-[var(--radius-sm)] neu-inset p-3 text-xs neu-text-muted">
-          <p className="font-semibold neu-text-strong">{artboard.name}</p>
-          <p className="mt-0.5">
-            {artboard.width} × {artboard.height} {artboard.unit}
-          </p>
-        </div>
-        <label className="mt-3 block text-[11px] font-medium neu-text-muted">
-          Preset
-          <select
-            value={findPresetKey(artboard.width, artboard.height)}
-            onChange={(e) => {
-              const preset = ARTBOARD_PRESETS.find((p) => p.key === e.target.value);
-              if (preset) {
-                setArtboard({ ...artboard, width: preset.width, height: preset.height });
+    <>
+      <SidebarGroup label="Setup">
+        <AccordionSection
+          id="artboard"
+          title="Artboard"
+          icon={FiFileText}
+          open={activePanel === "artboard"}
+          onToggle={setActivePanel}
+          summary={`${artboard.width} x ${artboard.height} ${artboard.unit}`}
+        >
+          <label className="block text-[11px] font-medium neu-text-muted">
+            Name
+            <input
+              type="text"
+              value={artboard.name}
+              onChange={(e) => setArtboard({ ...artboard, name: e.target.value })}
+              className={`${inputClass} mt-1 py-1.5 text-xs`}
+            />
+          </label>
+          <div className="rounded-[var(--radius-sm)] neu-inset p-3 text-xs neu-text-muted">
+            <p className="font-semibold neu-text-strong">{artboard.name}</p>
+            <p className="mt-0.5">
+              {artboard.width} × {artboard.height} {artboard.unit}
+            </p>
+          </div>
+          <label className="mt-3 block text-[11px] font-medium neu-text-muted">
+            Preset
+            <select
+              value={findPresetKey(artboard.width, artboard.height)}
+              onChange={(e) => {
+                const preset = ARTBOARD_PRESETS.find((p) => p.key === e.target.value);
+                if (preset) {
+                  setArtboard({ ...artboard, width: preset.width, height: preset.height });
+                }
+              }}
+              className={`${inputClass} mt-1 py-1.5 text-xs font-medium`}
+            >
+              <option value="">Custom</option>
+              {ARTBOARD_PRESETS.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <label className="text-[11px] font-medium neu-text-muted">
+              Width
+              <input
+                type="number"
+                min={MIN_MM}
+                max={MAX_MM}
+                value={artboard.width}
+                onChange={(e) => {
+                  const v = clamp(Number(e.target.value) || MIN_MM, MIN_MM, MAX_MM);
+                  setArtboard({ ...artboard, width: v });
+                }}
+                className={`${inputClass} mt-1 py-1.5 text-xs`}
+              />
+            </label>
+            <label className="text-[11px] font-medium neu-text-muted">
+              Height
+              <input
+                type="number"
+                min={MIN_MM}
+                max={MAX_MM}
+                value={artboard.height}
+                onChange={(e) => {
+                  const v = clamp(Number(e.target.value) || MIN_MM, MIN_MM, MAX_MM);
+                  setArtboard({ ...artboard, height: v });
+                }}
+                className={`${inputClass} mt-1 py-1.5 text-xs`}
+              />
+            </label>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setArtboard({ ...artboard, width: artboard.height, height: artboard.width })}
+              className="inline-flex items-center justify-center gap-1.5 neu-btn inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium"
+            >
+              <FiRotateCw className="h-3 w-3" />
+              Rotate
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setArtboard({
+                  ...artboard,
+                  background: artboard.background === "transparent" ? "#ffffff" : "transparent",
+                })
               }
-            }}
-            className={`${inputClass} mt-1 py-1.5 text-xs font-medium`}
-          >
-            <option value="">Custom</option>
-            {ARTBOARD_PRESETS.map((p) => (
-              <option key={p.key} value={p.key}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <label className="text-[11px] font-medium neu-text-muted">
-            Width
-            <input
-              type="number"
-              min={MIN_MM}
-              max={MAX_MM}
-              value={artboard.width}
-              onChange={(e) => {
-                const v = clamp(Number(e.target.value) || MIN_MM, MIN_MM, MAX_MM);
-                setArtboard({ ...artboard, width: v });
-              }}
-              className={`${inputClass} mt-1 py-1.5 text-xs`}
-            />
-          </label>
-          <label className="text-[11px] font-medium neu-text-muted">
-            Height
-            <input
-              type="number"
-              min={MIN_MM}
-              max={MAX_MM}
-              value={artboard.height}
-              onChange={(e) => {
-                const v = clamp(Number(e.target.value) || MIN_MM, MIN_MM, MAX_MM);
-                setArtboard({ ...artboard, height: v });
-              }}
-              className={`${inputClass} mt-1 py-1.5 text-xs`}
-            />
-          </label>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setArtboard({ ...artboard, width: artboard.height, height: artboard.width })}
-            className="inline-flex items-center justify-center gap-1.5 neu-btn inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium"
-          >
-            <FiRotateCw className="h-3 w-3" />
-            Rotate
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              setArtboard({
-                ...artboard,
-                background: artboard.background === "transparent" ? "#ffffff" : "transparent",
-              })
-            }
-            aria-pressed={artboard.background !== "transparent"}
-            className="inline-flex items-center justify-center neu-btn inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium"
-          >
-            {artboard.background === "transparent" ? "Transparent" : "White bg"}
-          </button>
-        </div>
-      </AccordionSection>
+              aria-pressed={artboard.background !== "transparent"}
+              className="inline-flex items-center justify-center neu-btn inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium"
+            >
+              {artboard.background === "transparent" ? "Transparent" : "White bg"}
+            </button>
+          </div>
+        </AccordionSection>
+      </SidebarGroup>
 
-      <AccordionSection
-        id="library"
-        title="Library"
-        icon={FiImage}
-        open={activePanel === "library"}
-        onToggle={setActivePanel}
-        summary={library.length === 0 ? "No images" : `${library.length} item${library.length === 1 ? "" : "s"}`}
-      >
-        <div className="space-y-3 neu-panel rounded-[var(--radius)] p-3">
-          <button
-            type="button"
-            onClick={openLibraryUpload}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-xs font-semibold"
-          >
-            <FiPlus className="h-3.5 w-3.5" />
-            Upload images
-          </button>
-          <div className="max-h-48 space-y-2 overflow-auto pr-1">
-            {library.length === 0 ? (
-              <p className="text-[11px] leading-relaxed neu-text-muted">
-                Upload PNG, JPG, GIF, or WebP files to your library, then drag them onto the artboard or use + to add.
-              </p>
-            ) : (
-              library.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-1 rounded-md border neu-chip neu-hover-inset"
-                >
+      <SidebarGroup label="Content">
+        <AccordionSection
+          id="library"
+          title="Library"
+          icon={FiImage}
+          open={activePanel === "library"}
+          onToggle={setActivePanel}
+          summary={library.length === 0 ? "No images" : `${library.length} item${library.length === 1 ? "" : "s"}`}
+        >
+          <div className="space-y-3 neu-panel rounded-[var(--radius)] p-3">
+            <button
+              type="button"
+              onClick={openLibraryUpload}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-xs font-semibold"
+            >
+              <FiPlus className="h-3.5 w-3.5" />
+              Upload images
+            </button>
+            <div className="max-h-48 space-y-2 overflow-auto pr-1">
+              {library.length === 0 ? (
+                <p className="text-[11px] leading-relaxed neu-text-muted">
+                  Upload PNG, JPG, GIF, or WebP files to your library, then drag them onto the artboard or use + to add.
+                </p>
+              ) : (
+                library.map((item) => (
                   <div
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData(LIBRARY_DRAG_MIME, item.id);
-                      e.dataTransfer.effectAllowed = "copy";
-                      const thumb = e.currentTarget.querySelector("img");
-                      if (thumb && e.dataTransfer.setDragImage) {
-                        e.dataTransfer.setDragImage(thumb, thumb.width / 2, thumb.height / 2);
-                      }
-                    }}
-                    className="flex min-w-0 flex-1 cursor-grab items-center gap-2 px-2 py-1.5 text-left text-[11px] active:cursor-grabbing"
-                    title="Drag onto artboard"
+                    key={item.id}
+                    className="flex items-center gap-1 rounded-md border neu-chip neu-hover-inset"
                   >
-                    <img src={item.src} alt="" className="pointer-events-none h-8 w-8 rounded object-cover" draggable={false} />
-                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                    <div
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(LIBRARY_DRAG_MIME, item.id);
+                        e.dataTransfer.effectAllowed = "copy";
+                        const thumb = e.currentTarget.querySelector("img");
+                        if (thumb && e.dataTransfer.setDragImage) {
+                          e.dataTransfer.setDragImage(thumb, thumb.width / 2, thumb.height / 2);
+                        }
+                      }}
+                      className="flex min-w-0 flex-1 cursor-grab items-center gap-2 px-2 py-1.5 text-left text-[11px] active:cursor-grabbing"
+                      title="Drag onto artboard"
+                    >
+                      <img src={item.src} alt="" className="pointer-events-none h-8 w-8 rounded object-cover" draggable={false} />
+                      <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => placeFromLibrary(item.id)}
+                      aria-label={`Add ${item.name} to artboard`}
+                      title="Add to artboard"
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md neu-text-muted transition hover:neu-text-strong"
+                    >
+                      <FiPlus className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeFromLibrary(item.id)}
+                      aria-label={`Remove ${item.name} from library`}
+                      className="mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md neu-text-muted transition hover:text-red-600 dark:hover:text-red-400"
+                    >
+                      <FiTrash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => placeFromLibrary(item.id)}
-                    aria-label={`Add ${item.name} to artboard`}
-                    title="Add to artboard"
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md neu-text-muted transition hover:neu-text-strong"
-                  >
-                    <FiPlus className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeFromLibrary(item.id)}
-                    aria-label={`Remove ${item.name} from library`}
-                    className="mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md neu-text-muted transition hover:text-red-600 dark:hover:text-red-400"
-                  >
-                    <FiTrash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
-      </AccordionSection>
+        </AccordionSection>
+      </SidebarGroup>
 
-      <AccordionSection
-        id="automations"
-        title="Automations"
-        icon={FiGrid}
-        open={activePanel === "automations"}
-        onToggle={setActivePanel}
-        summary="Cards and repeat grid"
-      >
-        <div className="space-y-3 neu-panel rounded-[var(--radius)] p-3">
-          <div className="rounded-[var(--radius-sm)] neu-inset p-2.5">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold neu-text-strong">Business cards</p>
-              <select
-                value={businessSheet}
-                onChange={(e) => setBusinessSheet(e.target.value)}
-                className="neu-input rounded-lg px-2 py-1 text-[11px] font-medium focus:outline-none"
-                aria-label="Business card sheet"
+      <SidebarGroup label="Layout">
+        <AccordionSection
+          id="automations"
+          title="Automations"
+          icon={FiGrid}
+          open={activePanel === "automations"}
+          onToggle={setActivePanel}
+          summary="N-up, fill & scale"
+        >
+          <div className="space-y-3 neu-panel rounded-[var(--radius)] p-3">
+            <div className="grid grid-cols-2 items-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLayoutLockAspect((v) => !v)}
+                aria-pressed={layoutLockAspect}
+                title={layoutLockAspect ? "Lock aspect ratio when laying out" : "Stretch to fill cells"}
+                className={`inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] px-2 py-2 text-[11px] font-semibold transition ${
+                  layoutLockAspect ? "neu-btn-primary" : "neu-btn"
+                }`}
               >
-                <option value="A4">A4 · 10</option>
-                <option value="A3">A3 · 24</option>
-              </select>
+                {layoutLockAspect ? (
+                  <FiLock className="h-3.5 w-3.5 shrink-0" />
+                ) : (
+                  <FiUnlock className="h-3.5 w-3.5 shrink-0" />
+                )}
+                Lock aspect
+              </button>
+              <label className="block text-[11px] font-medium neu-text-muted">
+                Gap (mm)
+                <input
+                  type="number"
+                  min={0}
+                  value={layoutGap}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (Number.isFinite(v)) setLayoutGap(v);
+                  }}
+                  className={`${inputClass} mt-1 w-full py-2 text-xs`}
+                />
+              </label>
             </div>
-            <button
-              type="button"
-              onClick={applyBusinessCardLayout}
-              disabled={elements.length === 0}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed"
-            >
-              <FiCreditCard className="h-3.5 w-3.5" />
-              Fill sheet
-            </button>
-          </div>
 
-          <div className="rounded-[var(--radius-sm)] neu-inset p-2.5">
-            <p className="mb-2 text-[11px] font-semibold neu-text-strong">Repeat grid</p>
-            <div className="grid grid-cols-3 gap-2">
-              <NumField label="Rows" value={gridRows} min={1} onChange={setGridRows} />
-              <NumField label="Cols" value={gridCols} min={1} onChange={setGridCols} />
-              <NumField label="Gap" value={gridGap} min={0} onChange={setGridGap} />
+            <div className="rounded-[var(--radius-sm)] neu-inset p-2.5">
+              <p className="mb-2 text-[11px] font-semibold neu-text-strong">Sheet copies</p>
+              <p className="mb-2 text-[10px] leading-relaxed neu-text-muted">
+                Uses selected image, or the first on the artboard.
+              </p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {N_UP_COUNTS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => applyNUpLayout(n)}
+                    disabled={elements.length === 0}
+                    className="neu-btn rounded-[var(--radius-sm)] px-1 py-2 text-[11px] font-semibold disabled:cursor-not-allowed"
+                  >
+                    {n}-up
+                  </button>
+                ))}
+              </div>
             </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={applyFillPage}
+                disabled={elements.length === 0}
+                title="Tile the page using the image at its current size"
+                className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed"
+              >
+                <FiCopy className="h-3.5 w-3.5" />
+                Fill page
+              </button>
+              <button
+                type="button"
+                onClick={applyBigAsPossible}
+                disabled={elements.length === 0}
+                title="Scale every image on the page to fill as much space as possible"
+                className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed"
+              >
+                <FiMaximize2 className="h-3.5 w-3.5" />
+                Big as possible
+              </button>
+            </div>
+
+            <div className="rounded-[var(--radius-sm)] neu-inset p-2.5">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold neu-text-strong">Business cards</p>
+                <select
+                  value={businessSheet}
+                  onChange={(e) => setBusinessSheet(e.target.value)}
+                  className="neu-input rounded-lg px-2 py-1 text-[11px] font-medium focus:outline-none"
+                  aria-label="Business card sheet"
+                >
+                  <option value="A4">A4 · 10</option>
+                  <option value="A3">A3 · 24</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={applyBusinessCardLayout}
+                disabled={elements.length === 0}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed"
+              >
+                <FiCreditCard className="h-3.5 w-3.5" />
+                Fill sheet
+              </button>
+            </div>
+          </div>
+        </AccordionSection>
+      </SidebarGroup>
+
+      <SidebarGroup label="Output">
+        <AccordionSection
+          id="export"
+          title="Export"
+          icon={FiDownload}
+          open={activePanel === "export"}
+          onToggle={setActivePanel}
+          summary="PDF, PNG & print"
+        >
+          <div className="space-y-2">
             <button
               type="button"
-              onClick={applyGridLayout}
-              disabled={elements.length === 0}
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed"
+              onClick={onDownloadPdf}
+              disabled={isExporting || elements.length === 0}
+              className="neu-btn-primary inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed"
             >
-              <FiGrid className="h-3.5 w-3.5" />
-              Fill grid
+              {isExporting ? (
+                <>
+                  <FiLoader className="h-4 w-4 animate-spin" />
+                  Generating PDF…
+                </>
+              ) : (
+                <>
+                  <FiDownload className="h-4 w-4" />
+                  Export PDF
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadPng}
+              disabled={isExportingPng || elements.length === 0}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed"
+            >
+              {isExportingPng ? (
+                <>
+                  <FiLoader className="h-4 w-4 animate-spin" />
+                  Generating PNG…
+                </>
+              ) : (
+                <>
+                  <FiImage className="h-4 w-4" />
+                  Export PNG
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={onPrint}
+              disabled={isPrinting}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed"
+            >
+              {isPrinting ? (
+                <>
+                  <FiLoader className="h-4 w-4 animate-spin" />
+                  Preparing print…
+                </>
+              ) : (
+                <>
+                  <FiPrinter className="h-4 w-4" />
+                  Print
+                </>
+              )}
             </button>
           </div>
-        </div>
-      </AccordionSection>
-    </div>
+        </AccordionSection>
+      </SidebarGroup>
+    </>
   );
 
   const specializedSidebar = (
     <AccordionSection
       id="specialized"
-      title="Specialized"
+      title="Canvas wrap"
       icon={FiBox}
       open={activePanel === "specialized"}
       onToggle={setActivePanel}
-      summary={isCanvasMode ? "Canvas wrap active" : "Canvas wrap layouts"}
+      summary={isCanvasMode ? "Active — gallery wrap" : "Gallery-wrap bleed & sheets"}
     >
       <div className="space-y-3 neu-panel rounded-[var(--radius)] p-3">
         {isCanvasMode ? (
@@ -1952,13 +2127,29 @@ function Editor({
 
         <div className="space-y-4">
           <div
-            className={isCanvasMode ? "pointer-events-none select-none opacity-45" : undefined}
+            className={`space-y-4 ${isCanvasMode ? "pointer-events-none select-none opacity-45" : ""}`}
             aria-hidden={isCanvasMode ? true : undefined}
             inert={isCanvasMode ? true : undefined}
           >
             {editorSidebarControls}
           </div>
-          {specializedSidebar}
+
+          <SidebarGroup label="Tools">
+            {specializedSidebar}
+          </SidebarGroup>
+
+          {!isCanvasMode ? (
+            <div className="border-t border-[var(--border)] pt-4">
+              <button
+                type="button"
+                onClick={onReset}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] neu-btn px-3 py-2 text-xs font-semibold neu-text-muted"
+              >
+                <FiRotateCw className="h-3.5 w-3.5" />
+                Reset document
+              </button>
+            </div>
+          ) : null}
         </div>
       </aside>
 
@@ -2127,6 +2318,15 @@ function StageToolbar({
           Snap {snapEnabled ? "on" : "off"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function SidebarGroup({ label, children }) {
+  return (
+    <div className="space-y-2">
+      <p className="px-1 text-[10px] font-semibold uppercase tracking-wider neu-text-muted">{label}</p>
+      <div className="space-y-2">{children}</div>
     </div>
   );
 }
