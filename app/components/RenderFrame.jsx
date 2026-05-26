@@ -25,7 +25,7 @@ export default function RenderFrame({
   if (w < 1 || h < 1) {
     return (
       <div
-        className={`flex min-h-[200px] items-center justify-center rounded-xl border border-dashed border-amber-500/35 bg-amber-950/30 text-sm text-amber-200/80 ${className}`}
+        className={`neu-inset flex min-h-[200px] items-center justify-center rounded-[var(--radius)] text-sm neu-text-muted ${className}`}
       >
         Set valid canvas dimensions to see the layout.
       </div>
@@ -36,16 +36,16 @@ export default function RenderFrame({
   const vb = `0 0 ${L.sheetWidth} ${L.sheetHeight}`;
 
   return (
-    <div className={`rounded-xl border border-amber-500/25 bg-gradient-to-b from-zinc-900 to-zinc-950 p-4 shadow-inner shadow-black/20 ${className}`}>
+    <div className={`neu-panel rounded-[var(--radius-lg)] p-4 ${className}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-bold uppercase tracking-wide text-amber-200">Live layout</span>
-        <span className="text-xs text-amber-200/70">
+        <span className="text-xs font-bold uppercase tracking-wide neu-text-muted">Live layout</span>
+        <span className="text-xs neu-text-muted">
           {L.sheetName} sheet · {L.sheetWidth}×{L.sheetHeight} mm
         </span>
       </div>
 
       <div
-        className="mx-auto w-full max-w-md overflow-hidden rounded-lg bg-zinc-950 ring-1 ring-zinc-700/80"
+        className="neu-inset mx-auto w-full max-w-md overflow-hidden rounded-[var(--radius)]"
         style={{ aspectRatio: `${L.sheetWidth} / ${L.sheetHeight}` }}
       >
         <svg viewBox={vb} className="h-full w-full" preserveAspectRatio="xMidYMid meet" aria-label="Sheet layout preview">
@@ -104,16 +104,16 @@ export default function RenderFrame({
       </div>
 
 {/* Debug info */}
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-amber-500/20 pt-3 text-[11px] text-amber-100">
-        <dt className="text-amber-300/80">Visible face</dt>
+      <dl className="neu-divider mt-3 grid grid-cols-2 gap-x-4 gap-y-1 pt-3 text-[11px] neu-text">
+        <dt className="neu-text-muted">Visible face</dt>
         <dd className="font-medium tabular-nums">
           {w}×{h} mm
         </dd>
-        <dt className="text-amber-300/80">Print block (face + wrap)</dt>
+        <dt className="neu-text-muted">Print block (face + wrap)</dt>
         <dd className="font-medium tabular-nums">
           {L.printWidth.toFixed(0)}×{L.printHeight.toFixed(0)} mm
         </dd>
-        <dt className="text-amber-300/80">Wrap margin (per side)</dt>
+        <dt className="neu-text-muted">Wrap margin (per side)</dt>
         <dd className="font-medium tabular-nums">{L.bleedMm.toFixed(0)} mm</dd>
       </dl>
     </div>

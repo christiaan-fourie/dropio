@@ -1,6 +1,5 @@
 import "./globals.css";
-
-import Header from "./components/Header";
+import { ThemeProvider, themeInitScript } from "./components/ThemeProvider";
 
 export const metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
@@ -9,7 +8,7 @@ export const metadata = {
     template: "%s | Dropio",
   },
   description:
-    "Free client-side tools for business card sheets, gallery canvas wraps, and custom print layouts. PDFs are generated locally—your files are not uploaded.",
+    "Local-first print layout editor with business-card automation, gallery canvas wraps, and PDF/PNG export—all in your browser.",
   applicationName: "Dropio",
   robots: { index: true, follow: true },
 };
@@ -18,12 +17,12 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-        <div className="flex min-h-screen flex-col bg-zinc-950">
-          <Header />
-          <main className="min-h-0 flex-1 overflow-auto">{children}</main>
-        </div>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="neu-bg min-h-screen antialiased">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

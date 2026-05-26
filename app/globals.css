@@ -1,7 +1,465 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
-  html {
+  :root {
+    /* Spacing rhythm */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+
+    /* Border radius — precise, production-tool scale */
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+
+    /* Elevation — shadows only where needed */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.24);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.32);
+
+    --transition-fast: color 0.12s ease, background-color 0.12s ease, border-color 0.12s ease,
+      box-shadow 0.12s ease;
+
+    /* Semantic (theme-agnostic) */
+    --danger: #ef4444;
+    --success: #22c55e;
+    --warning: #f59e0b;
+  }
+
+  /* Dark-first industrial palette */
+  html.dark {
     color-scheme: dark;
+
+    --bg: #0f1115;
+    --panel: #16181d;
+    --panel-2: #1c1f26;
+    --panel-3: #242833;
+    --panel-elevated: #1c1f26;
+    --panel-hover: #242833;
+
+    --border: #2d3340;
+    --border-soft: #232734;
+    --border-strong: #3d4656;
+
+    --text: #e6e9ef;
+    --text-muted: #9aa3b2;
+
+    --accent: #5b8cff;
+    --accent-hover: #7aa2ff;
+
+    --info-bg: color-mix(in srgb, var(--accent) 14%, var(--panel));
+    --info-text: #a8c4ff;
+
+    --artboard-bg: #ffffff;
+    --artboard-border: rgba(0, 0, 0, 0.1);
+    --artboard-checker-light: #ffffff;
+    --artboard-checker-dark: #e5e5e5;
+    --workspace-grid: color-mix(in srgb, var(--border) 55%, var(--panel-2));
+  }
+
+  /* Restrained light mode — same structure, no neumorphism */
+  html:not(.dark) {
+    color-scheme: light;
+
+    --bg: #e8eaee;
+    --panel: #f4f5f7;
+    --panel-2: #eceef2;
+    --panel-3: #e2e5eb;
+    --panel-elevated: #ffffff;
+    --panel-hover: #e8ebf0;
+
+    --border: #c8ced8;
+    --border-soft: #d8dde6;
+    --border-strong: #a8b0be;
+
+    --text: #1a1f28;
+    --text-muted: #5c6575;
+
+    --accent: #3d6fd9;
+    --accent-hover: #5b8cff;
+
+    --info-bg: #e8efff;
+    --info-text: #2a4a9e;
+
+    --artboard-bg: #ffffff;
+    --artboard-border: rgba(0, 0, 0, 0.08);
+    --artboard-checker-light: #ffffff;
+    --artboard-checker-dark: #e5e5e5;
+    --workspace-grid: color-mix(in srgb, var(--border) 40%, var(--panel-2));
+  }
+
+  /* Legacy token aliases (keep class names, new language) */
+  html.dark,
+  html:not(.dark) {
+    --neu-bg: var(--bg);
+    --neu-surface: var(--panel);
+    --neu-text: var(--text-muted);
+    --neu-text-strong: var(--text);
+    --neu-text-muted: var(--text-muted);
+    --neu-accent: var(--accent);
+    --neu-accent-light: var(--accent-hover);
+    --neu-accent-hover: var(--accent-hover);
+    --neu-danger: var(--danger);
+    --neu-success: var(--success);
+    --neu-warning: var(--warning);
+    --neu-info-bg: var(--info-bg);
+    --neu-info-text: var(--info-text);
+    --neu-radius-sm: var(--radius-sm);
+    --neu-radius: var(--radius);
+    --neu-radius-lg: var(--radius-lg);
+    --neu-transition: var(--transition-fast);
+  }
+
+  html {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+      sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  label,
+  .dropio-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+}
+
+@layer utilities {
+
+  /* ── Artboard ── */
+  .dropio-artboard-workspace,
+  .dropio-artboard-workspace * {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .dropio-artboard-workspace ::selection {
+    background: transparent;
+  }
+
+  /* ── Color helpers ── */
+  .neu-bg {
+    background-color: var(--bg);
+  }
+
+  .neu-surface {
+    background-color: var(--panel);
+  }
+
+  .neu-text {
+    color: var(--text-muted);
+  }
+
+  .neu-text-strong {
+    color: var(--text);
+  }
+
+  .neu-text-muted {
+    color: var(--text-muted);
+  }
+
+  /* ── Surfaces (border-first, minimal shadow) ── */
+  .neu-raised,
+  .neu-raised-lg,
+  .neu-raised-xl {
+    background-color: var(--panel-elevated);
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+
+  .neu-inset,
+  .neu-inset-sm {
+    background-color: var(--panel-2);
+    border: 1px solid var(--border-soft);
+    box-shadow: none;
+  }
+
+  .neu-panel {
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+
+  .neu-sidebar {
+    background-color: var(--bg);
+    border-right: 1px solid var(--border);
+    box-shadow: none;
+  }
+
+  .neu-workspace {
+    background-color: var(--panel-2);
+    border: 1px solid var(--border-soft);
+    box-shadow: none;
+  }
+
+  .neu-modal {
+    background-color: var(--panel-elevated);
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .neu-modal-backdrop {
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter: blur(4px);
+  }
+
+  .neu-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Input ── */
+  .neu-input {
+    background-color: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+  }
+
+  .neu-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .neu-input:hover:not(:disabled) {
+    border-color: var(--border-strong);
+  }
+
+  .neu-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+
+  /* ── Buttons ── */
+  .neu-btn {
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+    box-shadow: none;
+  }
+
+  .neu-btn:hover:not(:disabled) {
+    background-color: var(--panel-hover);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  .neu-btn:active:not(:disabled) {
+    background-color: var(--panel-2);
+  }
+
+  .neu-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .neu-btn-primary,
+  .neu-btn-accent {
+    background-color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 80%, var(--border-strong));
+    color: #fff;
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+    box-shadow: none;
+  }
+
+  .neu-btn-primary:hover:not(:disabled),
+  .neu-btn-accent:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  .neu-btn-primary:active:not(:disabled),
+  .neu-btn-accent:active:not(:disabled) {
+    filter: brightness(0.95);
+  }
+
+  .neu-btn-primary:disabled,
+  .neu-btn-accent:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: var(--panel-2);
+    border-color: var(--border);
+    color: var(--text-muted);
+  }
+
+  .neu-btn-dark {
+    background-color: var(--panel-3);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+    box-shadow: none;
+  }
+
+  .neu-btn-dark:hover:not(:disabled) {
+    background-color: var(--panel-hover);
+    border-color: var(--border-strong);
+  }
+
+  .neu-btn-warning {
+    background-color: var(--warning);
+    border: 1px solid color-mix(in srgb, var(--warning) 75%, #000);
+    color: #1a1206;
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+    box-shadow: none;
+  }
+
+  .neu-btn-warning:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+
+  .neu-danger-btn {
+    background-color: transparent;
+    border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+    color: var(--danger);
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+    box-shadow: none;
+  }
+
+  .neu-danger-btn:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--danger) 10%, var(--panel));
+    border-color: var(--danger);
+  }
+
+  .neu-icon-btn {
+    background-color: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    transition: var(--transition-fast);
+    box-shadow: none;
+  }
+
+  .neu-icon-btn:hover {
+    background-color: var(--panel-hover);
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  .neu-icon-btn:active {
+    background-color: var(--panel-2);
+  }
+
+  .neu-logo {
+    background-color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 70%, var(--border));
+    color: #fff;
+    box-shadow: none;
+  }
+
+  .neu-dropzone {
+    background-color: var(--panel-2);
+    border: 1px dashed var(--border-strong);
+    box-shadow: none;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .neu-dropzone:hover {
+    border-color: var(--accent);
+    background-color: color-mix(in srgb, var(--accent) 4%, var(--panel-2));
+  }
+
+  .neu-chip {
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    transition: var(--transition-fast);
+    box-shadow: none;
+  }
+
+  .neu-chip:hover {
+    background-color: var(--panel-hover);
+    color: var(--text);
+  }
+
+  .neu-chip-active {
+    background-color: color-mix(in srgb, var(--accent) 12%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+    color: var(--accent);
+    box-shadow: none;
+  }
+
+  .neu-toggle-on {
+    background-color: color-mix(in srgb, var(--accent) 14%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+    color: var(--accent);
+    box-shadow: none;
+  }
+
+  .neu-toggle-off {
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    transition: var(--transition-fast);
+    box-shadow: none;
+  }
+
+  .neu-toggle-off:hover {
+    background-color: var(--panel-hover);
+    color: var(--text);
+  }
+
+  .neu-icon-badge {
+    background-color: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    box-shadow: none;
+  }
+
+  .neu-info-panel {
+    background-color: var(--info-bg);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+    color: var(--info-text);
+    box-shadow: none;
+  }
+
+  .neu-context-menu {
+    background-color: var(--panel-elevated);
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-md);
+  }
+
+  .neu-menu-item:hover {
+    background-color: var(--panel-hover);
+    transition: var(--transition-fast);
+    box-shadow: none;
+  }
+
+  .neu-artboard-shadow {
+    background-color: var(--artboard-bg);
+    border: 1px solid var(--artboard-border);
+    box-shadow: var(--shadow-md);
+  }
+
+  .neu-hover-inset:hover {
+    background-color: var(--panel-hover);
+    transition: var(--transition-fast);
+  }
+
+  .dropio-drag-active {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
   }
 }

@@ -1,26 +1,49 @@
 # Dropio
 
-**Dropio** is a browser-based toolkit for print shops and designers. It helps you lay out business cards, canvas gallery wraps, and arbitrary sheet jobs, then export **PDFs** sized in millimeters on standard sheets (**wrap-side bleed** is modeled for canvas; cards and custom layouts focus on placement and sheet use). A **file inspector** utility reports real format, dimensions, and PDF page counts from uploads, using local detection (magic bytes and light parsing) so nothing is sent to a server for that inspection.
+**Dropio** is a local-first, browser-based print layout editor for print shops and designers. Drop artwork onto a millimeter artboard, arrange it with drag-and-resize, run sheet automations (business cards, repeat grids), and export **PDF** or **PNG**—all in the browser, with no upload-to-server step.
 
-The app is built with [Next.js](https://nextjs.org) (App Router), [React](https://react.dev), [Tailwind CSS](https://tailwindcss.com), and [Chakra UI](https://chakra-ui.com). PDF generation and file inspection run **entirely in the client** using [jsPDF](https://github.com/parallax/jsPDF), [pdf-lib](https://pdf-lib.js.org/), and custom layout math.
+A separate **Canvas Wrap** tool (`/canvas-wrap`) handles gallery-wrap jobs with frame-depth bleed math and its own PDF export.
 
-## What’s in the box
+The app is built with [Next.js](https://nextjs.org) (App Router), [React](https://react.dev), and [Tailwind CSS](https://tailwindcss.com). PDF and PNG export run **entirely in the client** using [jsPDF](https://github.com/parallax/jsPDF), [pdf-lib](https://pdf-lib.js.org/), and canvas rasterization.
 
-| Tool | Route | Purpose |
-|------|--------|---------|
-| **Business cards** | `/business-cards` | **90×50mm** cards on **A4 or A3** in a fixed grid (1mm spacing), **PNG/JPG** embed via **pdf-lib**, optional **duplex** with mirrored columns on the back; live preview. |
-| **Canvas wrap** | `/canvas-wrap` | **jsPDF** export: image fitted to the printable block (**face + gallery-wrap bleed** from frame depth and extra margin), centered on the parent sheet; preview matches export geometry. |
-| **Custom size layout** | `/custom-layout` | Item **width/height (mm)** and **quantity**; **pdf-lib** packs rows on the smallest suitable **A-series** sheet (see `customLayoutMath.js`). |
-| **File inspector** | `/file-inspector` | Upload PDF or common raster/vector types; see detected kind, size, dimensions, PDF page count—**local only**. |
+## What's in the box
 
-The home page (`/`) lists these tools with category filters. Tool pages use a **sidebar** layout (`app/(pages)/layout.jsx`); the root layout adds a **site header** (`app/layout.js`).
+| Surface | Route | Purpose |
+|---------|--------|---------|
+| **Dropio editor** | `/` | Artboard-based layout: drop images, move/resize with snapping, multi-select, cut lines, business-card and repeat-grid automations, **PDF** (300 DPI) and **PNG** export. |
+| **Canvas wrap** | `/canvas-wrap` | Gallery-wrap export: image fitted to the printable block (**face + wrap-side bleed** from frame depth and extra margin), centered on the parent sheet; live preview matches export geometry. |
 
-## Features
+### Legacy URL redirects
 
-- **Automated layouts** for business cards, canvas wraps (with wrap-side bleed), and custom-sized items on standard **A-series** sheets.
-- **PDF export in the browser** (**pdf-lib** for cards and custom layouts; **jsPDF** for canvas wraps)—no upload-to-server step for generation.
-- **Live preview** for cards and canvas (including `RenderFrame` alignment with canvas PDF placement).
-- **File inspector** for quick local checks on PDFs and common image types.
+These older standalone tool URLs redirect to `/` for anyone with bookmarks:
+
+| Legacy route | Redirects to |
+|--------------|--------------|
+| `/business-cards` | `/` |
+| `/custom-layout` | `/` |
+| `/file-inspector` | `/` |
+
+Business-card sheet layout is built into the editor's **Automations** panel (90×50mm cards on A4 or A3).
+
+`/page` also renders the same editor as `/` if you need a stable secondary URL.
+
+## Editor features
+
+- **Custom artboards** — Presets (A4, A3, A2, US Letter, squares, poster) or manual width/height in mm; optional white or transparent background.
+- **Image placement** — Drag, resize, layer order, marquee and multi-select, copy/paste/duplicate, snap guides to artboard and other elements.
+- **Cut lines** — Optional 0.5pt cutting-line overlay per element, included in PDF export.
+- **Automations**
+  - **Business cards** — Fill an A4 (10-up) or A3 (24-up) sheet from selected artwork at 90×50mm with 1mm spacing.
+  - **Repeat grid** — Tile artwork in a configurable rows × cols grid with gap.
+- **Export**
+  - **PDF** — 300 DPI rasterization via jsPDF (`pageTool.js`).
+  - **PNG** — 300 DPI raster export with optional transparent background (`renderPage.js`).
+
+## Canvas wrap features
+
+- Preset canvas sizes with parent-sheet guidance.
+- Frame thickness and extra bleed inputs; geometry shared between preview (`RenderFrame`) and PDF export.
+- Accepts common image uploads (including PDF first-page normalization via `pdfToImage.js`).
 
 ## Getting started
 
@@ -41,38 +64,40 @@ Other scripts:
 
 ### Optional environment
 
-- **`NEXT_PUBLIC_SITE_URL`** — Canonical site URL (used for `metadataBase` and Open Graph–style URLs). If unset, local dev defaults to `http://localhost:3000`; on Vercel, `VERCEL_URL` can be inferred where applicable.
+- **`NEXT_PUBLIC_SITE_URL`** — Canonical site URL (used for `metadataBase` and Open Graph–style URLs). If unset, local dev defaults to `http://localhost:3000`.
+- **`NEXT_PUBLIC_GITHUB_REPO_URL`** — GitHub repo link shown in the editor sidebar (defaults to the project repository).
 
 ## Project structure
 
 ```
 app/
-  layout.js                 # Root HTML shell, metadata, Header
-  page.js                   # Home: tool catalog + categories
+  layout.js                 # Root HTML shell and metadata
+  page.js                   # Home: Dropio editor (PageClient)
   globals.css
-  components/               # Header, Sidebar, shared UI (e.g. Heading, RenderFrame)
-  (pages)/                  # Route group (URLs unchanged)
-    layout.jsx              # Sidebar + main column for tools
-    business-cards/page.js
-    canvas-wrap/page.js
-    custom-layout/page.js
-    file-inspector/         # page.js + FileInspectorClient.jsx
+  components/               # RenderFrame, CanvasWrapWorkspace
+  (pages)/                  # Route group
+    layout.jsx              # Minimal wrapper for tool routes
+    page/
+      PageClient.jsx        # Main editor UI and document model
+      page.js               # Same editor at /page
+    canvas-wrap/page.js     # Canvas wrap tool
   lib/
+    page/
+      renderPage.js         # PNG raster export
+      persistState.js       # Local editor state persistence
     pdf/                    # Client PDF pipeline
-      businessCards.js
+      pageTool.js           # Editor PDF export (300 DPI)
       canvasWrap.js
       canvasSheetLayout.js
-      customLayout.js
-      customLayoutMath.js
-      workers.js            # download / worker helpers
-      index.js              # Public exports for generators + download
+      workers.js            # Download helpers
+      index.js              # Public exports
     file/
-      inspectFile.js        # Sniffing + dimension/page inspection
+      pdfToImage.js         # PDF page → image for uploads
 ```
 
 ## Prepress note
 
-Page sizes and geometry are **millimeter-based**. **Canvas wrap** models **gallery-wrap bleed** from your thickness and extra inputs. **Business cards** currently use **trim size only** (no bleed field in the layout math—see `business-cards/page.js`). Embedded images are passed through from uploads; for commercial offset or wide-gamut ink, prepare **resolution and color** in source artwork and use your normal RIP or PDF workflow—this app does not perform **CMYK separation** or enforce **300dpi** in code (some UI copy still references print-shop targets).
+All geometry is **millimeter-based**. **Canvas wrap** models **gallery-wrap bleed** from frame thickness and extra margin. **Business-card automation** in the editor uses **trim size only** (90×50mm, no bleed field). PDF and PNG export rasterize images to **300 DPI** at the element's physical size on the artboard. Embedded images are passed through from uploads; for commercial offset or wide-gamut ink, prepare **resolution and color** in source artwork and use your normal RIP or PDF workflow—this app does not perform **CMYK separation**.
 
 ## Learn more
 
