@@ -3328,16 +3328,19 @@ function ArtboardStage({
   const wheelVelocityRef = useRef({ x: 0, y: 0 }); // px / frame impulse (smoothed in rAF)
   const wheelRafRef = useRef(0);
   const wheelLastTsRef = useRef(0);
+  const boardDragRef = useRef(null);
 
-  const displayScale = fitScale * viewZoom;
   const workspaceBounds = useMemo(
     () => artboardBounds(artboards, WORKSPACE_FIT_PADDING_MM),
     [artboards]
   );
-  const workspaceOrigin = useMemo(
-    () => ({ x: workspaceBounds.minX, y: workspaceBounds.minY }),
-    [workspaceBounds]
-  );
+  const lockedWorkspaceLayout = boardDragRef.current?.layoutBounds ?? workspaceBounds;
+  const lockedFitScale = boardDragRef.current?.fitScale ?? fitScale;
+  const displayScale = lockedFitScale * viewZoom;
+  const workspaceOrigin = {
+    x: lockedWorkspaceLayout.minX,
+    y: lockedWorkspaceLayout.minY,
+  };
   const activeArtboard = useMemo(
     () => artboards.find((board) => board.id === activeArtboardId) ?? artboards[0] ?? null,
     [artboards, activeArtboardId]
@@ -3350,7 +3353,6 @@ function ArtboardStage({
   viewZoomRef.current = viewZoom;
   const spaceHeldRef = useRef(false);
   const panDragRef = useRef(null);
-  const boardDragRef = useRef(null);
   const activeBoardFrameRef = useRef(null);
 
   const setPan = useCallback(
@@ -3555,6 +3557,7 @@ function ArtboardStage({
     const node = containerRef.current;
     if (!node) return;
     const measure = () => {
+      if (boardDragRef.current) return;
       const rect = node.getBoundingClientRect();
       const padding = 32;
       const maxW = Math.max(100, rect.width - padding);
@@ -3572,8 +3575,8 @@ function ArtboardStage({
     };
   }, [workspaceBounds.width, workspaceBounds.height]);
 
-  const boardPxW = workspaceBounds.width * displayScale;
-  const boardPxH = workspaceBounds.height * displayScale;
+  const boardPxW = lockedWorkspaceLayout.width * displayScale;
+  const boardPxH = lockedWorkspaceLayout.height * displayScale;
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedElements = useMemo(
@@ -4056,6 +4059,8 @@ function ArtboardStage({
         originX: board.x,
         originY: board.y,
         pointerNode: e.currentTarget,
+        layoutBounds: workspaceBounds,
+        fitScale,
       };
       setIsDraggingBoard(true);
       try {
