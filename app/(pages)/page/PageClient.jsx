@@ -48,6 +48,15 @@ import {
   hydratePersistedImages,
 } from "@/app/lib/page/persistState";
 import {
+  artboardBounds,
+  boardElements,
+  createDefaultArtboard,
+  ensureActiveArtboardId,
+  nextBoardPosition,
+  normalizeArtboards,
+  normalizeElementArtboardIds,
+} from "@/app/lib/page/artboardModel";
+import {
   cloneEditorDocument,
   MAX_UNDO_HISTORY,
   sanitizeSelection,
@@ -119,13 +128,9 @@ const ARTBOARD_PRESETS = [
   { key: "A2L", label: "A2 Landscape · 594×420mm", width: 594, height: 420 }
 ];
 
-const DEFAULT_ARTBOARD = {
-  name: "Magic",
-  width: 210,
-  height: 297,
-  unit: "mm",
-  background: "transparent",
-};
+function createDefaultArtboards() {
+  return [createDefaultArtboard(0)];
+}
 
 const BUSINESS_CARD_SHEETS = {
   A4: { width: 210, height: 297, cols: 2, rows: 5 },
@@ -460,7 +465,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
   const [viewMode, setViewMode] = useState(() =>
     initialViewMode === "canvas-wrap" ? "canvas-wrap" : "editor"
   );
-  const [artboard, setArtboard] = useState(DEFAULT_ARTBOARD);
+  const [artboards, setArtboards] = useState(() => createDefaultArtboards());
+  const [activeArtboardId, setActiveArtboardId] = useState(() => artboards[0]?.id ?? null);
   const [elements, setElements] = useState([]);
   const [library, setLibrary] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -475,7 +481,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
   const [canvasWrap, setCanvasWrap] = useState(() => ({ ...DEFAULT_CANVAS_WRAP, files: [] }));
   const [persistReady, setPersistReady] = useState(false);
   const hydratedRef = useRef(false);
-  const prevArtboardSizeRef = useRef(null);
+  const prevActiveArtboardSizeRef = useRef(null);
 
   // Refs keep imperative handlers (keyboard shortcuts, drag callbacks) in sync
   // without re-binding every render.
@@ -485,8 +491,16 @@ export default function PageClient({ initialViewMode = "editor" }) {
   libraryRef.current = library;
   const selectedIdsRef = useRef(selectedIds);
   selectedIdsRef.current = selectedIds;
-  const artboardRef = useRef(artboard);
-  artboardRef.current = artboard;
+  const artboardsRef = useRef(artboards);
+  artboardsRef.current = artboards;
+  const activeArtboardIdRef = useRef(activeArtboardId);
+  activeArtboardIdRef.current = activeArtboardId;
+  const activeArtboard = useMemo(
+    () => artboards.find((board) => board.id === activeArtboardId) ?? artboards[0] ?? null,
+    [artboards, activeArtboardId]
+  );
+  const artboardRef = useRef(activeArtboard);
+  artboardRef.current = activeArtboard;
 
   const undoStackRef = useRef([]);
   const redoStackRef = useRef([]);
@@ -497,7 +511,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
     undoStackRef.current.push(
       cloneEditorDocument({
         elements: elementsRef.current,
-        artboard: artboardRef.current,
+        artboards: artboardsRef.current,
+        activeArtboardId: activeArtboardIdRef.current,
         selectedIds: selectedIdsRef.current,
       })
     );
@@ -515,7 +530,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
   const applyHistorySnapshot = useCallback((snapshot) => {
     if (!snapshot) return;
     isApplyingHistoryRef.current = true;
-    setArtboard(snapshot.artboard);
+    setArtboards(snapshot.artboards);
+    setActiveArtboardId(snapshot.activeArtboardId ?? snapshot.artboards?.[0]?.id ?? null);
     setElements(snapshot.elements);
     setSelectedIds(sanitizeSelection(snapshot.selectedIds, snapshot.elements));
     isApplyingHistoryRef.current = false;
@@ -526,7 +542,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
     redoStackRef.current.push(
       cloneEditorDocument({
         elements: elementsRef.current,
-        artboard: artboardRef.current,
+        artboards: artboardsRef.current,
+        activeArtboardId: activeArtboardIdRef.current,
         selectedIds: selectedIdsRef.current,
       })
     );
@@ -542,7 +559,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
     undoStackRef.current.push(
       cloneEditorDocument({
         elements: elementsRef.current,
-        artboard: artboardRef.current,
+        artboards: artboardsRef.current,
+        activeArtboardId: activeArtboardIdRef.current,
         selectedIds: selectedIdsRef.current,
       })
     );
@@ -553,10 +571,81 @@ export default function PageClient({ initialViewMode = "editor" }) {
     return true;
   }, [applyHistorySnapshot]);
 
-  const updateArtboard = useCallback(
+  const updateActiveArtboard = useCallback(
     (next) => {
       pushUndoSnapshot();
-      setArtboard((prev) => (typeof next === "function" ? next(prev) : next));
+      setArtboards((prev) => {
+        const currentId = activeArtboardIdRef.current;
+        return prev.map((board) => {
+          if (board.id !== currentId) return board;
+          const nextBoard = typeof next === "function" ? next(board) : next;
+          return { ...board, ...nextBoard, id: board.id };
+        });
+      });
+    },
+    [pushUndoSnapshot]
+  );
+
+  const replaceBoardElements = useCallback((boardId, nextElements) => {
+    setElements((prev) => {
+      const remaining = prev.filter((el) => el.artboardId !== boardId);
+      return [...remaining, ...nextElements];
+    });
+  }, []);
+
+  const addArtboard = useCallback(() => {
+    pushUndoSnapshot();
+    const nextIndex = artboardsRef.current.length;
+    const position = nextBoardPosition(artboardsRef.current);
+    const board = createDefaultArtboard(nextIndex, position);
+    setArtboards((prev) => [...prev, board]);
+    setActiveArtboardId(board.id);
+    setSelectedIds([]);
+  }, [pushUndoSnapshot]);
+
+  const duplicateArtboard = useCallback(() => {
+    const current = artboardRef.current;
+    if (!current) return;
+    pushUndoSnapshot();
+    const boards = artboardsRef.current;
+    const offset = nextBoardPosition(boards, current.width);
+    const { id: clonedId } = createDefaultArtboard(boards.length, offset);
+    const cloned = {
+      ...current,
+      id: clonedId,
+      name: `${current.name} copy`,
+      x: offset.x,
+      y: offset.y,
+    };
+    const clonedElements = elementsRef.current
+      .filter((el) => el.artboardId === current.id)
+      .map((el) => ({ ...el, id: makeId(), artboardId: cloned.id }));
+    setArtboards((prev) => [...prev, cloned]);
+    setElements((prev) => [...prev, ...clonedElements]);
+    setActiveArtboardId(cloned.id);
+    setSelectedIds(clonedElements.map((el) => el.id));
+  }, [pushUndoSnapshot]);
+
+  const removeArtboard = useCallback(
+    (boardId = activeArtboardIdRef.current) => {
+      const boards = artboardsRef.current;
+      if (boards.length <= 1) {
+        const defaults = createDefaultArtboards();
+        pushUndoSnapshot();
+        setArtboards(defaults);
+        setElements([]);
+        setSelectedIds([]);
+        setActiveArtboardId(defaults[0].id);
+        return;
+      }
+
+      const nextBoards = boards.filter((board) => board.id !== boardId);
+      if (nextBoards.length === boards.length) return;
+      pushUndoSnapshot();
+      setArtboards(nextBoards);
+      setElements((prev) => prev.filter((el) => el.artboardId !== boardId));
+      setSelectedIds([]);
+      setActiveArtboardId(nextBoards[0].id);
     },
     [pushUndoSnapshot]
   );
@@ -581,7 +670,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
 
     (async () => {
       const boot = readInitialEditorState(initialViewMode);
-      const loadedArtboard = boot.artboard ?? DEFAULT_ARTBOARD;
+      const loadedArtboards = normalizeArtboards(boot.artboards, boot.artboard);
+      const normalizedActiveArtboardId = ensureActiveArtboardId(boot.activeArtboardId, loadedArtboards);
       const { library: hydratedLibrary, elements: hydratedElements } = await hydratePersistedImages(
         boot.library ?? [],
         boot.elements ?? []
@@ -596,8 +686,9 @@ export default function PageClient({ initialViewMode = "editor" }) {
         trackBlobUrl(el.src);
       }
 
-      setArtboard(loadedArtboard);
-      setElements(hydratedElements);
+      setArtboards(loadedArtboards);
+      setActiveArtboardId(normalizedActiveArtboardId);
+      setElements(normalizeElementArtboardIds(hydratedElements, loadedArtboards, normalizedActiveArtboardId));
       setLibrary(hydratedLibrary);
       setSnapEnabled(boot.snapEnabled);
       setBusinessSheet(boot.businessSheet);
@@ -616,9 +707,10 @@ export default function PageClient({ initialViewMode = "editor" }) {
       if (cancelled) return;
 
       setCanvasWrap({ ...DEFAULT_CANVAS_WRAP, ...boot.canvasWrapMeta, files: canvasFiles });
-      prevArtboardSizeRef.current = {
-        width: loadedArtboard.width,
-        height: loadedArtboard.height,
+      const initialBoard = loadedArtboards.find((board) => board.id === normalizedActiveArtboardId) ?? loadedArtboards[0];
+      prevActiveArtboardSizeRef.current = {
+        width: initialBoard.width,
+        height: initialBoard.height,
       };
       hydratedRef.current = true;
       setPersistReady(true);
@@ -639,7 +731,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
     const timer = window.setTimeout(() => {
       savePersistedState({
         viewMode,
-        artboard,
+        artboards,
+        activeArtboardId,
         elements,
         library,
         snapEnabled,
@@ -654,7 +747,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
   }, [
     persistReady,
     viewMode,
-    artboard,
+    artboards,
+    activeArtboardId,
     elements,
     library,
     snapEnabled,
@@ -667,16 +761,17 @@ export default function PageClient({ initialViewMode = "editor" }) {
 
   useEffect(() => {
     if (!hydratedRef.current) return;
-    if (!prevArtboardSizeRef.current) {
-      prevArtboardSizeRef.current = { width: artboard.width, height: artboard.height };
+    if (!activeArtboard) return;
+    if (!prevActiveArtboardSizeRef.current) {
+      prevActiveArtboardSizeRef.current = { width: activeArtboard.width, height: activeArtboard.height };
       return;
     }
-    const prev = prevArtboardSizeRef.current;
-    if (prev.width !== artboard.width || prev.height !== artboard.height) {
+    const prev = prevActiveArtboardSizeRef.current;
+    if (prev.width !== activeArtboard.width || prev.height !== activeArtboard.height) {
       setViewport(DEFAULT_VIEWPORT);
     }
-    prevArtboardSizeRef.current = { width: artboard.width, height: artboard.height };
-  }, [artboard.width, artboard.height]);
+    prevActiveArtboardSizeRef.current = { width: activeArtboard.width, height: activeArtboard.height };
+  }, [activeArtboard]);
 
   useEffect(() => {
     return () => {
@@ -691,7 +786,9 @@ export default function PageClient({ initialViewMode = "editor" }) {
     setElements([]);
     setLibrary([]);
     setSelectedIds([]);
-    setArtboard(DEFAULT_ARTBOARD);
+    const defaults = createDefaultArtboards();
+    setArtboards(defaults);
+    setActiveArtboardId(defaults[0].id);
     setSnapEnabled(true);
     setBusinessSheet("A4");
     setGridRows(3);
@@ -707,7 +804,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
     setIsExporting(true);
     try {
       const { pdfBytes, filename } = await generatePagePDF({
-        artboard: artboardRef.current,
+        artboards: artboardsRef.current,
         elements: elementsRef.current,
       });
       downloadPdfBytes(pdfBytes, filename);
@@ -724,7 +821,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
     setIsExportingPng(true);
     try {
       const { blob, filename } = await generatePagePNG({
-        artboard: artboardRef.current,
+        artboard: artboardsRef.current,
         elements: elementsRef.current,
       });
       downloadBlob(blob, filename);
@@ -743,7 +840,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
       const board = artboardRef.current;
       const { blob } = await generatePagePNG({
         artboard: board,
-        elements: elementsRef.current,
+        elements: boardElements(elementsRef.current, board.id),
       });
 
       const url = window.URL.createObjectURL(blob);
@@ -879,6 +976,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
         return next;
       });
       if (placed.length > 0) {
+        setActiveArtboardId(board.id);
         setSelectedIds([placed[placed.length - 1].id]);
       }
       return placed;
@@ -943,7 +1041,10 @@ export default function PageClient({ initialViewMode = "editor" }) {
         placed = createShapeElement(shapeKind, board, layer, makeId);
         return [...prev, placed];
       });
-      if (placed) setSelectedIds([placed.id]);
+      if (placed) {
+        setActiveArtboardId(board.id);
+        setSelectedIds([placed.id]);
+      }
     },
     [pushUndoSnapshot]
   );
@@ -1058,7 +1159,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
   );
 
   const selectAll = useCallback(() => {
-    setSelectedIds(elementsRef.current.map((el) => el.id));
+    const boardId = activeArtboardIdRef.current;
+    setSelectedIds(elementsRef.current.filter((el) => el.artboardId === boardId).map((el) => el.id));
   }, []);
 
   const reorderLayer = useCallback(
@@ -1104,11 +1206,12 @@ export default function PageClient({ initialViewMode = "editor" }) {
     if (!board) return;
     pushUndoSnapshot();
     setElements((prev) => {
-      const n = prev.length;
+      const current = prev.filter((el) => el.artboardId === board.id);
+      const n = current.length;
       if (n === 0) return prev;
 
       if (n === 1) {
-        const el = prev[0];
+        const el = current[0];
         return prev.map((p) =>
           p.id === el.id
             ? {
@@ -1120,8 +1223,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
         );
       }
 
-      const maxW = Math.max(...prev.map((e) => e.width));
-      const maxH = Math.max(...prev.map((e) => e.height));
+      const maxW = Math.max(...current.map((e) => e.width));
+      const maxH = Math.max(...current.map((e) => e.height));
 
       // Search every possible column count and score by: 1) whether the grid
       // fits inside the artboard at all, 2) whether at least its width fits
@@ -1144,7 +1247,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
       // Reading order with a row-banding tolerance so near-aligned items
       // don't flip when one is slightly higher/lower than its neighbour.
       const band = Math.max(1, maxH / 2);
-      const sorted = [...prev].sort((a, b) => {
+      const sorted = [...current].sort((a, b) => {
         const ay = Math.round(a.y / band);
         const by = Math.round(b.y / band);
         if (ay !== by) return ay - by;
@@ -1183,7 +1286,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
    * `offsetMm` is applied to x/y. Pass 0 for Alt-drag (clone stays at the source
    * position while the drag moves the original away) and a non-zero value for keyboard paste.
    */
-  const insertCopy = useCallback((source, offsetMm = 0) => {
+  const insertCopy = useCallback((source, offsetMm = 0, artboardId = source?.artboardId) => {
     if (!source) return null;
     const newId = makeId();
     const nx = source.x + offsetMm;
@@ -1195,6 +1298,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
         {
           ...source,
           id: newId,
+          artboardId,
           x: nx,
           y: ny,
           layer: topLayer,
@@ -1247,7 +1351,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
     pushUndoSnapshot();
     const newIds = [];
     for (const s of src) {
-      const id = insertCopy(s, PASTE_OFFSET_MM);
+      const id = insertCopy(s, PASTE_OFFSET_MM, activeArtboardIdRef.current);
       if (id) newIds.push(id);
     }
     if (newIds.length > 0) setSelectedIds(newIds);
@@ -1255,9 +1359,11 @@ export default function PageClient({ initialViewMode = "editor" }) {
 
   const applyBusinessCardLayout = useCallback(() => {
     const sheet = BUSINESS_CARD_SHEETS[businessSheet];
+    const board = artboardRef.current;
+    const currentElements = elementsRef.current.filter((el) => el.artboardId === board.id);
     const source =
-      elementsRef.current.find((el) => selectedIdsRef.current.includes(el.id)) ||
-      elementsRef.current[0];
+      currentElements.find((el) => selectedIdsRef.current.includes(el.id)) ||
+      currentElements[0];
     if (!source) {
       alert("Add or select artwork before creating a business-card sheet.");
       return;
@@ -1285,16 +1391,16 @@ export default function PageClient({ initialViewMode = "editor" }) {
     }
 
     pushUndoSnapshot();
-    setArtboard({
-      ...artboardRef.current,
+    updateActiveArtboard((prev) => ({
+      ...prev,
       name: `Business cards ${businessSheet}`,
       width: sheet.width,
       height: sheet.height,
       background: "transparent",
-    });
-    setElements(arranged);
+    }));
+    replaceBoardElements(board.id, arranged);
     setSelectedIds(arranged.map((el) => el.id));
-  }, [businessSheet, pushUndoSnapshot]);
+  }, [artboardRef, businessSheet, pushUndoSnapshot, replaceBoardElements, updateActiveArtboard]);
 
   const applyNUpLayout = useCallback(
     (count) => {
@@ -1302,7 +1408,10 @@ export default function PageClient({ initialViewMode = "editor" }) {
       const n = clamp(Math.round(Number(count) || 1), 1, 50);
       const gap = clamp(Number(layoutGap) || 0, 0, 100);
       const lockAspect = layoutLockAspect;
-      const source = layoutSourceElement(elementsRef.current, selectedIdsRef.current);
+      const source = layoutSourceElement(
+        elementsRef.current.filter((el) => el.artboardId === board.id),
+        selectedIdsRef.current
+      );
 
       if (!source) {
         alert("Add or select artwork first.");
@@ -1335,21 +1444,24 @@ export default function PageClient({ initialViewMode = "editor" }) {
       }
 
       pushUndoSnapshot();
-      setArtboard({
+      updateActiveArtboard({
         ...board,
         name: n === 1 ? source.name || "1-up" : `${n}-up`,
       });
-      setElements(arranged);
+      replaceBoardElements(board.id, arranged);
       setSelectedIds(arranged.map((el) => el.id));
     },
-    [layoutGap, layoutLockAspect, pushUndoSnapshot]
+    [layoutGap, layoutLockAspect, pushUndoSnapshot, replaceBoardElements, updateActiveArtboard]
   );
 
   const applyFillPage = useCallback(() => {
     const board = artboardRef.current;
     const gap = clamp(Number(layoutGap) || 0, 0, 100);
     const lockAspect = layoutLockAspect;
-    const source = layoutSourceElement(elementsRef.current, selectedIdsRef.current);
+    const source = layoutSourceElement(
+      elementsRef.current.filter((el) => el.artboardId === board.id),
+      selectedIdsRef.current
+    );
 
     if (!source) {
       alert("Add or select artwork first.");
@@ -1384,16 +1496,16 @@ export default function PageClient({ initialViewMode = "editor" }) {
     }
 
     pushUndoSnapshot();
-    setArtboard({ ...board, name: "Fill page" });
-    setElements(arranged);
+    updateActiveArtboard({ ...board, name: "Fill page" });
+    replaceBoardElements(board.id, arranged);
     setSelectedIds(arranged.map((el) => el.id));
-  }, [layoutGap, layoutLockAspect, pushUndoSnapshot]);
+  }, [layoutGap, layoutLockAspect, pushUndoSnapshot, replaceBoardElements, updateActiveArtboard]);
 
   const applyBigAsPossible = useCallback(() => {
     const board = artboardRef.current;
     const gap = clamp(Number(layoutGap) || 0, 0, 100);
     const lockAspect = layoutLockAspect;
-    const prev = elementsRef.current;
+    const prev = elementsRef.current.filter((el) => el.artboardId === board.id);
 
     if (prev.length === 0) {
       alert("Add images to the artboard first.");
@@ -1423,13 +1535,15 @@ export default function PageClient({ initialViewMode = "editor" }) {
         });
       });
 
-      return prev.map((p) => (updates.has(p.id) ? { ...p, ...updates.get(p.id) } : p));
+      return elementsRef.current.map((p) =>
+        p.artboardId === board.id && updates.has(p.id) ? { ...p, ...updates.get(p.id) } : p
+      );
     });
   }, [layoutGap, layoutLockAspect, pushUndoSnapshot]);
 
   // Global shortcuts + paste (OS images and internal element clipboard). Ignored while typing.
   useEffect(() => {
-    if (!artboard) return;
+    if (artboards.length === 0) return;
     const onPaste = (e) => {
       if (viewMode !== "editor" || isEditableTarget(e.target)) return;
       const imageFiles = imageFilesFromClipboard(e.clipboardData);
@@ -1501,7 +1615,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
       document.removeEventListener("keydown", onKey);
     };
   }, [
-    artboard,
+    artboards,
     viewMode,
     undo,
     redo,
@@ -1517,8 +1631,15 @@ export default function PageClient({ initialViewMode = "editor" }) {
   return (
     <div className="h-[100dvh] overflow-hidden neu-bg neu-text-strong">
       <Editor
-        artboard={artboard}
-        setArtboard={updateArtboard}
+        activeArtboard={activeArtboard}
+        artboards={artboards}
+        activeArtboardId={activeArtboardId}
+        setActiveArtboardId={setActiveArtboardId}
+        setArtboards={setArtboards}
+        updateActiveArtboard={updateActiveArtboard}
+        addArtboard={addArtboard}
+        duplicateArtboard={duplicateArtboard}
+        removeArtboard={removeArtboard}
         elements={elements}
         library={library}
         selectedIds={selectedIds}
@@ -1575,8 +1696,15 @@ export default function PageClient({ initialViewMode = "editor" }) {
 }
 
 function Editor({
-  artboard,
-  setArtboard,
+  activeArtboard,
+  artboards,
+  activeArtboardId,
+  setActiveArtboardId,
+  setArtboards,
+  updateActiveArtboard,
+  addArtboard,
+  duplicateArtboard,
+  removeArtboard,
   elements,
   library,
   selectedIds,
@@ -1630,11 +1758,6 @@ function Editor({
 }) {
   const isCanvasMode = viewMode === "canvas-wrap";
 
-  const sortedByLayer = useMemo(
-    () => [...elements].sort((a, b) => a.layer - b.layer),
-    [elements]
-  );
-
   const [libraryDragOver, setLibraryDragOver] = useState(false);
 
   const onDrop = useCallback(
@@ -1666,8 +1789,8 @@ function Editor({
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedElements = useMemo(
-    () => elements.filter((el) => selectedSet.has(el.id)),
-    [elements, selectedSet]
+    () => elements.filter((el) => selectedSet.has(el.id) && el.artboardId === activeArtboardId),
+    [elements, selectedSet, activeArtboardId]
   );
   const githubUrl = githubRepoUrl();
   const [activePanel, setActivePanel] = useState("artboard");
@@ -1708,31 +1831,84 @@ function Editor({
           icon={FiFileText}
           open={activePanel === "artboard"}
           onToggle={setActivePanel}
-          summary={`${artboard.width} x ${artboard.height} ${artboard.unit}`}
+          summary={`${activeArtboard.width} x ${activeArtboard.height} ${activeArtboard.unit}`}
         >
+          <div className="mb-3 rounded-[var(--radius-sm)] neu-inset p-2">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide neu-text-muted">Projects</p>
+              <button
+                type="button"
+                onClick={addArtboard}
+                className="neu-btn rounded-md px-2 py-1 text-[11px] font-medium"
+              >
+                Add
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              {artboards.map((board, index) => (
+                <button
+                  key={board.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveArtboardId(board.id);
+                    setSelectedIds([]);
+                  }}
+                  className={`flex w-full items-start justify-between rounded-md px-2 py-1.5 text-left text-[11px] transition ${board.id === activeArtboardId ? "neu-chip-active" : "neu-chip neu-hover-inset"
+                    }`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{board.name}</span>
+                    <span className="block text-[10px] neu-text-muted">
+                      {board.width} × {board.height} {board.unit}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide neu-text-muted">
+                    {index + 1}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={duplicateArtboard}
+                className="neu-btn rounded-md px-2 py-1 text-[11px] font-medium"
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                onClick={() => removeArtboard(activeArtboardId)}
+                className="neu-danger-btn rounded-md px-2 py-1 text-[11px] font-medium"
+                disabled={artboards.length <= 1}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
           <label className="block text-[11px] font-medium neu-text-muted">
             Name
             <input
               type="text"
-              value={artboard.name}
-              onChange={(e) => setArtboard({ ...artboard, name: e.target.value })}
+              value={activeArtboard.name}
+              onChange={(e) => updateActiveArtboard({ ...activeArtboard, name: e.target.value })}
               className={`${inputClass} mt-1 py-1.5 text-xs`}
             />
           </label>
           <div className="rounded-[var(--radius-sm)] neu-inset p-3 text-xs neu-text-muted">
-            <p className="font-semibold neu-text-strong">{artboard.name}</p>
+            <p className="font-semibold neu-text-strong">{activeArtboard.name}</p>
             <p className="mt-0.5">
-              {artboard.width} × {artboard.height} {artboard.unit}
+              {activeArtboard.width} × {activeArtboard.height} {activeArtboard.unit}
             </p>
           </div>
           <label className="mt-3 block text-[11px] font-medium neu-text-muted">
             Preset
             <select
-              value={findPresetKey(artboard.width, artboard.height)}
+              value={findPresetKey(activeArtboard.width, activeArtboard.height)}
               onChange={(e) => {
                 const preset = ARTBOARD_PRESETS.find((p) => p.key === e.target.value);
                 if (preset) {
-                  setArtboard({ ...artboard, width: preset.width, height: preset.height });
+                  updateActiveArtboard({ ...activeArtboard, width: preset.width, height: preset.height });
                 }
               }}
               className={`${inputClass} mt-1 py-1.5 text-xs font-medium`}
@@ -1749,20 +1925,20 @@ function Editor({
             <label className="text-[11px] font-medium neu-text-muted">
               Width
               <DraftNumberField
-                value={artboard.width}
+                value={activeArtboard.width}
                 min={MIN_MM}
                 max={MAX_MM}
-                onCommit={(v) => setArtboard((prev) => ({ ...prev, width: v }))}
+                onCommit={(v) => updateActiveArtboard((prev) => ({ ...prev, width: v }))}
                 className={`${inputClass} mt-1 py-1.5 text-xs`}
               />
             </label>
             <label className="text-[11px] font-medium neu-text-muted">
               Height
               <DraftNumberField
-                value={artboard.height}
+                value={activeArtboard.height}
                 min={MIN_MM}
                 max={MAX_MM}
-                onCommit={(v) => setArtboard((prev) => ({ ...prev, height: v }))}
+                onCommit={(v) => updateActiveArtboard((prev) => ({ ...prev, height: v }))}
                 className={`${inputClass} mt-1 py-1.5 text-xs`}
               />
             </label>
@@ -1770,7 +1946,13 @@ function Editor({
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setArtboard({ ...artboard, width: artboard.height, height: artboard.width })}
+              onClick={() =>
+                updateActiveArtboard({
+                  ...activeArtboard,
+                  width: activeArtboard.height,
+                  height: activeArtboard.width,
+                })
+              }
               className="inline-flex items-center justify-center gap-1.5 neu-btn inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium"
             >
               <FiRotateCw className="h-3 w-3" />
@@ -1779,15 +1961,16 @@ function Editor({
             <button
               type="button"
               onClick={() =>
-                setArtboard({
-                  ...artboard,
-                  background: artboard.background === "transparent" ? "#ffffff" : "transparent",
+                updateActiveArtboard({
+                  ...activeArtboard,
+                  background:
+                    activeArtboard.background === "transparent" ? "#ffffff" : "transparent",
                 })
               }
-              aria-pressed={artboard.background !== "transparent"}
+              aria-pressed={activeArtboard.background !== "transparent"}
               className="inline-flex items-center justify-center neu-btn inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium"
             >
-              {artboard.background === "transparent" ? "Transparent" : "White bg"}
+              {activeArtboard.background === "transparent" ? "Transparent" : "White bg"}
             </button>
           </div>
         </AccordionSection>
@@ -1908,9 +2091,8 @@ function Editor({
                 onClick={() => setLayoutLockAspect((v) => !v)}
                 aria-pressed={layoutLockAspect}
                 title={layoutLockAspect ? "Lock aspect ratio when laying out" : "Stretch to fill cells"}
-                className={`inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] px-2 py-2 text-[11px] font-semibold transition ${
-                  layoutLockAspect ? "neu-btn-primary" : "neu-btn"
-                }`}
+                className={`inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] px-2 py-2 text-[11px] font-semibold transition ${layoutLockAspect ? "neu-btn-primary" : "neu-btn"
+                  }`}
               >
                 {layoutLockAspect ? (
                   <FiLock className="h-3.5 w-3.5 shrink-0" />
@@ -2118,9 +2300,9 @@ function Editor({
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden lg:grid lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="shrink-0 neu-sidebar p-4 lg:sticky lg:top-0 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:p-5">
-        <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="mb-5 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <span className="neu-logo flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)]">
+            <span className="neu-logo flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)]">
               <FiLayers className="h-5 w-5" aria-hidden />
             </span>
             <span className="min-w-0">
@@ -2175,9 +2357,9 @@ function Editor({
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--bg)] p-3 sm:p-4">
         {isCanvasMode ? (
           <>
-            <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
-              <div>
-                <h1 className="neu-text-strong">Canvas Wrap</h1>
+            <div className="mb-3 grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
+              <div className="min-w-0">
+                <h1 className="truncate neu-text-strong">Canvas Wrap</h1>
                 <p className="mt-0.5 text-[13px] neu-text-muted">
                   Gallery-wrap bleed and sheet placement — export PDF locally.
                 </p>
@@ -2185,7 +2367,7 @@ function Editor({
               <button
                 type="button"
                 onClick={() => setViewMode("editor")}
-                className="neu-btn inline-flex items-center gap-2 rounded-[var(--radius-sm)] px-3 py-1.5 text-sm font-medium transition"
+                className="neu-btn inline-flex shrink-0 items-center gap-2 self-start rounded-[var(--radius-sm)] px-3 py-1.5 text-sm font-medium transition"
               >
                 <FiArrowLeft className="h-4 w-4" />
                 Back to editor
@@ -2197,7 +2379,7 @@ function Editor({
           </>
         ) : (
           <>
-            <div className="mb-3 shrink-0">
+            <div className="mb-3 shrink-0 min-w-0">
               <h1 className="neu-text-strong">Workspace</h1>
               <p className="mt-0.5 text-[13px] neu-text-muted">Arrange artwork, apply layout automation, export locally.</p>
             </div>
@@ -2227,10 +2409,13 @@ function Editor({
               >
                 <input {...getInputProps()} aria-label="Drop images onto artboard" />
                 <ArtboardStage
-                  artboard={artboard}
-                  elements={sortedByLayer}
+                  artboards={artboards}
+                  activeArtboardId={activeArtboardId}
+                  elements={elements}
                   selectedIds={selectedIds}
                   setSelectedIds={setSelectedIds}
+                  setActiveArtboardId={setActiveArtboardId}
+                  setArtboards={setArtboards}
                   patchElement={patchElement}
                   patchElements={patchElements}
                   updateElement={updateElement}
@@ -3083,10 +3268,13 @@ function isLibraryDragEvent(e) {
 }
 
 function ArtboardStage({
-  artboard,
+  artboards,
+  activeArtboardId,
   elements,
   selectedIds,
   setSelectedIds,
+  setActiveArtboardId,
+  setArtboards,
   patchElement,
   patchElements,
   updateElement,
@@ -3119,11 +3307,21 @@ function ArtboardStage({
   const [marquee, setMarquee] = useState(null); // { x, y, w, h } in mm during marquee drag
   const [contextMenu, setContextMenu] = useState(null); // { x, y, elementId, targetIds }
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [isDraggingBoard, setIsDraggingBoard] = useState(false);
   const wheelVelocityRef = useRef({ x: 0, y: 0 }); // px / frame impulse (smoothed in rAF)
   const wheelRafRef = useRef(0);
   const wheelLastTsRef = useRef(0);
 
   const displayScale = fitScale * viewZoom;
+  const workspaceBounds = useMemo(() => artboardBounds(artboards, 160), [artboards]);
+  const workspaceOrigin = useMemo(
+    () => ({ x: workspaceBounds.minX, y: workspaceBounds.minY }),
+    [workspaceBounds]
+  );
+  const activeArtboard = useMemo(
+    () => artboards.find((board) => board.id === activeArtboardId) ?? artboards[0] ?? null,
+    [artboards, activeArtboardId]
+  );
   const panRef = useRef(pan);
   panRef.current = pan;
   const fitScaleRef = useRef(fitScale);
@@ -3132,6 +3330,8 @@ function ArtboardStage({
   viewZoomRef.current = viewZoom;
   const spaceHeldRef = useRef(false);
   const panDragRef = useRef(null);
+  const boardDragRef = useRef(null);
+  const activeBoardFrameRef = useRef(null);
 
   const setPan = useCallback(
     (next) => {
@@ -3166,12 +3366,16 @@ function ArtboardStage({
   elementsRef.current = elements;
   const selectedIdsRef = useRef(selectedIds);
   selectedIdsRef.current = selectedIds;
+  const activeArtboardIdRef = useRef(activeArtboardId);
+  activeArtboardIdRef.current = activeArtboardId;
   const scaleRef = useRef(displayScale);
   scaleRef.current = displayScale;
   const snapEnabledRef = useRef(snapEnabled);
   snapEnabledRef.current = snapEnabled;
-  const artboardRef = useRef(artboard);
-  artboardRef.current = artboard;
+  const artboardsRef = useRef(artboards);
+  artboardsRef.current = artboards;
+  const artboardRef = useRef(activeArtboard);
+  artboardRef.current = activeArtboard;
 
   useEffect(() => {
     const releaseSpace = () => {
@@ -3218,34 +3422,33 @@ function ArtboardStage({
 
     const zoomAtPoint = (clientX, clientY, deltaY) => {
       const rect = node.getBoundingClientRect();
-      const mx = clientX - rect.left;
-      const my = clientY - rect.top;
       const fit = fitScaleRef.current;
       const prevZoom = viewZoomRef.current;
       const factor = deltaY < 0 ? ZOOM_WHEEL_FACTOR : 1 / ZOOM_WHEEL_FACTOR;
       const nextZoom = clamp(prevZoom * factor, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM);
       if (Math.abs(nextZoom - prevZoom) < 1e-6) return;
 
-      const board = artboardRef.current;
       const prevScale = fit * prevZoom;
-      const boardW = board.width * prevScale;
-      const boardH = board.height * prevScale;
-      const boardLeft = (rect.width - boardW) / 2 + panRef.current.x;
-      const boardTop = (rect.height - boardH) / 2 + panRef.current.y;
-
-      const mmX = (mx - boardLeft) / prevScale;
-      const mmY = (my - boardTop) / prevScale;
-
+      const workspaceNode = boardRef.current;
+      if (!workspaceNode || prevScale <= 0) return;
+      const workspaceRect = workspaceNode.getBoundingClientRect();
+      // Pointer position in workspace-mm, relative to the workspace origin.
+      const localMmX = (clientX - workspaceRect.left) / prevScale;
+      const localMmY = (clientY - workspaceRect.top) / prevScale;
+      const workspaceMmW = workspaceRect.width / prevScale;
+      const workspaceMmH = workspaceRect.height / prevScale;
       const nextScale = fit * nextZoom;
-      const newBoardW = board.width * nextScale;
-      const newBoardH = board.height * nextScale;
-      const newBoardLeft = mx - mmX * nextScale;
-      const newBoardTop = my - mmY * nextScale;
+      const nextWorkspacePxW = workspaceMmW * nextScale;
+      const nextWorkspacePxH = workspaceMmH * nextScale;
+      const desiredWorkspaceLeft = clientX - localMmX * nextScale;
+      const desiredWorkspaceTop = clientY - localMmY * nextScale;
+      const centeredLeft = rect.left + (rect.width - nextWorkspacePxW) / 2;
+      const centeredTop = rect.top + (rect.height - nextWorkspacePxH) / 2;
 
       setViewZoom(nextZoom);
       setPan({
-        x: newBoardLeft - (rect.width - newBoardW) / 2,
-        y: newBoardTop - (rect.height - newBoardH) / 2,
+        x: desiredWorkspaceLeft - centeredLeft,
+        y: desiredWorkspaceTop - centeredTop,
       });
     };
 
@@ -3336,7 +3539,7 @@ function ArtboardStage({
       const padding = 32;
       const maxW = Math.max(100, rect.width - padding);
       const maxH = Math.max(100, rect.height - padding);
-      const s = Math.min(maxW / artboard.width, maxH / artboard.height);
+      const s = Math.min(maxW / workspaceBounds.width, maxH / workspaceBounds.height);
       setFitScale(Number.isFinite(s) && s > 0 ? s : 1);
     };
     measure();
@@ -3347,15 +3550,15 @@ function ArtboardStage({
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [artboard.width, artboard.height]);
+  }, [workspaceBounds.width, workspaceBounds.height]);
 
-  const boardPxW = artboard.width * displayScale;
-  const boardPxH = artboard.height * displayScale;
+  const boardPxW = workspaceBounds.width * displayScale;
+  const boardPxH = workspaceBounds.height * displayScale;
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedElements = useMemo(
-    () => elements.filter((el) => selectedSet.has(el.id)),
-    [elements, selectedSet]
+    () => elements.filter((el) => selectedSet.has(el.id) && el.artboardId === activeArtboardId),
+    [elements, selectedSet, activeArtboardId]
   );
   const singleSelected = selectedElements.length === 1 ? selectedElements[0] : null;
 
@@ -3395,8 +3598,17 @@ function ArtboardStage({
       if (spaceHeldRef.current) return;
       e.preventDefault();
       e.stopPropagation();
+      const element = elementsRef.current.find((item) => item.id === elementId);
+      if (element?.artboardId && element.artboardId !== activeArtboardIdRef.current) {
+        setActiveArtboardId(element.artboardId);
+      }
 
-      const current = selectedIdsRef.current;
+      const current = element?.artboardId
+        ? selectedIdsRef.current.filter((selectedId) => {
+          const item = elementsRef.current.find((el) => el.id === selectedId);
+          return item?.artboardId === element.artboardId;
+        })
+        : selectedIdsRef.current;
       const inSel = current.includes(elementId);
       const targetIds = inSel ? current : [elementId];
       if (!inSel) setSelectedIds([elementId]);
@@ -3408,7 +3620,7 @@ function ArtboardStage({
         targetIds,
       });
     },
-    [setSelectedIds]
+    [setActiveArtboardId, setSelectedIds]
   );
 
   const runMenuAction = useCallback((action) => {
@@ -3420,12 +3632,20 @@ function ArtboardStage({
   // modifier keys, handles Alt-duplicate, and snapshots origins for the drag.
   // Returns true if the caller should begin a drag.
   const beginElementDrag = useCallback(
-    (id, e, mode) => {
+    (id, boardId, e, mode) => {
       if (spaceHeldRef.current) return false;
+      if (boardId && boardId !== activeArtboardIdRef.current) {
+        setActiveArtboardId(boardId);
+      }
 
       const shift = e.shiftKey;
       const mod = e.metaKey || e.ctrlKey;
-      const current = selectedIdsRef.current;
+      const current = boardId
+        ? selectedIdsRef.current.filter((selectedId) => {
+          const el = elementsRef.current.find((item) => item.id === selectedId);
+          return el?.artboardId === boardId;
+        })
+        : selectedIdsRef.current;
       const inSel = current.includes(id);
 
       let nextSelection;
@@ -3471,7 +3691,7 @@ function ArtboardStage({
       dragOriginsRef.current = { ids: idsToDrag, origins, primaryId: id, mode };
       return true;
     },
-    [duplicateSelectedInPlace, pushUndoSnapshot, setSelectedIds]
+    [duplicateSelectedInPlace, pushUndoSnapshot, setActiveArtboardId, setSelectedIds]
   );
 
   const beginGroupResize = useCallback(
@@ -3539,7 +3759,9 @@ function ArtboardStage({
         let box = newBounds;
         if (snapEnabledRef.current) {
           const idSet = new Set(ids);
-          const others = elementsRef.current.filter((el) => !idSet.has(el.id));
+          const others = elementsRef.current.filter(
+            (el) => !idSet.has(el.id) && el.artboardId === board.id
+          );
           const thresholdMm = SNAP_THRESHOLD_PX / Math.max(scaleRef.current, 0.001);
           const res = applySnap(newBounds, mode, board, others, thresholdMm);
           setGuides(res.guides);
@@ -3558,7 +3780,9 @@ function ArtboardStage({
       });
 
       if (snapEnabledRef.current) {
-        const others = elementsRef.current.filter((item) => item.id !== id);
+        const others = elementsRef.current.filter(
+          (item) => item.id !== id && item.artboardId === board.id
+        );
         const thresholdMm = SNAP_THRESHOLD_PX / Math.max(scaleRef.current, 0.001);
         const res = applySnap(box, mode, board, others, thresholdMm);
         setGuides(res.guides);
@@ -3593,7 +3817,9 @@ function ArtboardStage({
           height: prim.height,
         };
         const idSet = new Set(ids);
-        const others = elementsRef.current.filter((el) => !idSet.has(el.id));
+        const others = elementsRef.current.filter(
+          (el) => !idSet.has(el.id) && el.artboardId === board.id
+        );
         const thresholdMm = SNAP_THRESHOLD_PX / Math.max(scaleRef.current, 0.001);
         const res = applySnap(proposed, "move", board, others, thresholdMm);
         guideLines = res.guides;
@@ -3612,21 +3838,69 @@ function ArtboardStage({
   }, []);
 
   const handleDragEnd = useCallback(() => {
+    const drag = dragOriginsRef.current;
+    if (drag && drag.mode === "move") {
+      const movedIds = drag.ids || [];
+      if (movedIds.length > 0) {
+        const updates = {};
+        let nextActiveBoardId = activeArtboardIdRef.current;
+
+        for (const id of movedIds) {
+          const el = elementsRef.current.find((item) => item.id === id);
+          if (!el) continue;
+
+          const sourceBoard = artboardsRef.current.find((board) => board.id === el.artboardId);
+          if (!sourceBoard) continue;
+
+          const workspaceLeft = sourceBoard.x + el.x;
+          const workspaceTop = sourceBoard.y + el.y;
+          const centerX = workspaceLeft + el.width / 2;
+          const centerY = workspaceTop + el.height / 2;
+
+          const targetBoard = artboardsRef.current.find(
+            (board) =>
+              centerX >= board.x &&
+              centerX <= board.x + board.width &&
+              centerY >= board.y &&
+              centerY <= board.y + board.height
+          );
+
+          if (!targetBoard || targetBoard.id === el.artboardId) continue;
+
+          updates[id] = {
+            artboardId: targetBoard.id,
+            x: workspaceLeft - targetBoard.x,
+            y: workspaceTop - targetBoard.y,
+          };
+          if (id === drag.primaryId) {
+            nextActiveBoardId = targetBoard.id;
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          patchElementsRef.current(updates);
+          if (nextActiveBoardId !== activeArtboardIdRef.current) {
+            setActiveArtboardId(nextActiveBoardId);
+          }
+        }
+      }
+    }
+
     dragOriginsRef.current = null;
     setGuides({ xs: [], ys: [] });
   }, []);
 
   // ---- Marquee selection across the workspace frame (including outside the artboard) ----
-  const pointToMm = useCallback((clientX, clientY) => {
-    const node = boardRef.current;
+  const pointToWorkspaceMm = useCallback((clientX, clientY) => {
+    const node = boardRef.current || containerRef.current;
     if (!node) return { x: 0, y: 0 };
     const rect = node.getBoundingClientRect();
     const s = scaleRef.current;
     return {
-      x: (clientX - rect.left) / s,
-      y: (clientY - rect.top) / s,
+      x: (clientX - rect.left) / s + workspaceOrigin.x,
+      y: (clientY - rect.top) / s + workspaceOrigin.y,
     };
-  }, []);
+  }, [workspaceOrigin.x, workspaceOrigin.y]);
 
   const updateMarqueeSelection = useCallback(
     (startX, startY, cx, cy, additive, baseSelection) => {
@@ -3638,11 +3912,15 @@ function ArtboardStage({
 
       const hit = [];
       for (const el of elementsRef.current) {
+        const board = artboardsRef.current.find((item) => item.id === el.artboardId);
+        if (!board) continue;
+        const ex = board.x + el.x;
+        const ey = board.y + el.y;
         const intersects = !(
-          el.x + el.width < x ||
-          el.x > x + w ||
-          el.y + el.height < y ||
-          el.y > y + h
+          ex + el.width < x ||
+          ex > x + w ||
+          ey + el.height < y ||
+          ey > y + h
         );
         if (intersects) hit.push(el.id);
       }
@@ -3663,33 +3941,33 @@ function ArtboardStage({
       e.preventDefault();
       window.getSelection()?.removeAllRanges();
       const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+      const workspacePoint = pointToWorkspaceMm(e.clientX, e.clientY);
       if (!additive) setSelectedIds([]);
-      const { x, y } = pointToMm(e.clientX, e.clientY);
       marqueeStateRef.current = {
-        startX: x,
-        startY: y,
+        startX: workspacePoint.x,
+        startY: workspacePoint.y,
         additive,
         baseSelection: additive ? [...selectedIdsRef.current] : [],
         pointerId: e.pointerId,
       };
-      setMarquee({ x, y, w: 0, h: 0 });
+      setMarquee({ x: workspacePoint.x, y: workspacePoint.y, w: 0, h: 0 });
       try {
         containerRef.current?.setPointerCapture(e.pointerId);
       } catch {
         // ignore capture errors
       }
     },
-    [pointToMm, setSelectedIds]
+    [pointToWorkspaceMm, setSelectedIds]
   );
 
   const onMarqueePointerMove = useCallback(
     (e) => {
       const m = marqueeStateRef.current;
       if (!m || m.pointerId !== e.pointerId) return;
-      const { x: cx, y: cy } = pointToMm(e.clientX, e.clientY);
+      const { x: cx, y: cy } = pointToWorkspaceMm(e.clientX, e.clientY);
       updateMarqueeSelection(m.startX, m.startY, cx, cy, m.additive, m.baseSelection);
     },
-    [pointToMm, updateMarqueeSelection]
+    [pointToWorkspaceMm, updateMarqueeSelection]
   );
 
   const endMarquee = useCallback((e) => {
@@ -3743,13 +4021,69 @@ function ArtboardStage({
     }
   }, []);
 
+  const beginBoardDrag = useCallback(
+    (board, e) => {
+      if (spaceHeldRef.current || e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveArtboardId(board.id);
+      setSelectedIds([]);
+      boardDragRef.current = {
+        boardId: board.id,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        originX: board.x,
+        originY: board.y,
+        pointerNode: e.currentTarget,
+      };
+      setIsDraggingBoard(true);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+    },
+    [setActiveArtboardId]
+  );
+
+  const onBoardDragMove = useCallback(
+    (e) => {
+      const drag = boardDragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      const dxMm = (e.clientX - drag.startX) / scaleRef.current;
+      const dyMm = (e.clientY - drag.startY) / scaleRef.current;
+      setArtboards((prev) =>
+        prev.map((board) =>
+          board.id === drag.boardId
+            ? { ...board, x: drag.originX + dxMm, y: drag.originY + dyMm }
+            : board
+        )
+      );
+    },
+    [setArtboards]
+  );
+
+  const endBoardDrag = useCallback((e) => {
+    const drag = boardDragRef.current;
+    if (!drag) return;
+    if (e && drag.pointerId !== e.pointerId) return;
+    boardDragRef.current = null;
+    setIsDraggingBoard(false);
+    try {
+      drag.pointerNode?.releasePointerCapture?.(drag.pointerId);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const panCursor = isPanning ? "cursor-grabbing" : spaceHeld ? "cursor-grab" : "";
 
-  let marqueeBoardOffset = { left: 0, top: 0 };
+  let marqueeWorkspaceOffsetPx = { left: 0, top: 0 };
   if (marquee && containerRef.current && boardRef.current) {
     const containerRect = containerRef.current.getBoundingClientRect();
     const boardRect = boardRef.current.getBoundingClientRect();
-    marqueeBoardOffset = {
+    marqueeWorkspaceOffsetPx = {
       left: boardRect.left - containerRect.left,
       top: boardRect.top - containerRect.top,
     };
@@ -3783,17 +4117,15 @@ function ArtboardStage({
       e.preventDefault();
       e.stopPropagation();
       onLibraryDragOverChange?.(false);
-      const position = clientPointToArtboardMm(
-        e.clientX,
-        e.clientY,
-        containerRef.current,
-        artboardRef.current,
-        scaleRef.current,
-        panRef.current
-      );
-      placeFromLibrary(libraryId, position);
+      const board = artboardRef.current;
+      if (!board) return;
+      const workspacePoint = pointToWorkspaceMm(e.clientX, e.clientY);
+      placeFromLibrary(libraryId, {
+        x: workspacePoint.x - board.x,
+        y: workspacePoint.y - board.y,
+      });
     },
-    [placeFromLibrary, onLibraryDragOverChange]
+    [placeFromLibrary, onLibraryDragOverChange, pointToWorkspaceMm]
   );
 
   useEffect(() => {
@@ -3828,13 +4160,16 @@ function ArtboardStage({
       }}
       onPointerMove={(e) => {
         onPanPointerMove(e);
+        onBoardDragMove(e);
         onMarqueePointerMove(e);
       }}
       onPointerUp={(e) => {
+        endBoardDrag(e);
         endPan(e);
         endMarquee(e);
       }}
       onPointerCancel={(e) => {
+        endBoardDrag(e);
         endPan(e);
         endMarquee(e);
       }}
@@ -3853,47 +4188,93 @@ function ArtboardStage({
             overflow: "visible",
           }}
         >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 rounded-sm neu-artboard-shadow"
-            style={artboardSurfaceStyles(artboard)}
-          />
-          {elements.map((el) => (
-            <ElementView
-              key={el.id}
-              element={el}
-              scale={displayScale}
-              isSelected={selectedIds.includes(el.id)}
-              beginElementDrag={beginElementDrag}
-              onDragMove={handleDragMoveDelta}
-              onDragEnd={handleDragEnd}
-              onContextMenu={openElementContextMenu}
-              canShowResizeHandle={selectedIds.length === 1 && selectedIds[0] === el.id}
-              panToolActive={spaceHeld}
-            />
-          ))}
-          {selectionBounds && selectedIds.length > 1 ? (
-            <SelectionGroupOverlay
-              bounds={selectionBounds}
-              scale={displayScale}
-              zIndex={selectionOverlayZ}
-              primaryId={selectedIds[0]}
-              selectedIds={selectedIds}
-              panToolActive={spaceHeld}
-              beginGroupResize={beginGroupResize}
-              onDragMove={handleDragMoveDelta}
-              onDragEnd={handleDragEnd}
-              markGroupAspectBroken={markGroupAspectBroken}
-            />
-          ) : null}
-          <SnapGuides guides={guides} scale={displayScale} boardPxW={boardPxW} boardPxH={boardPxH} />
+          {artboards.map((board) => {
+            const isActive = board.id === activeArtboardId;
+            const left = (board.x - workspaceOrigin.x) * displayScale;
+            const top = (board.y - workspaceOrigin.y) * displayScale;
+            const width = board.width * displayScale;
+            const height = board.height * displayScale;
+            const boardEls = boardElements(elements, board.id).sort((a, b) => a.layer - b.layer);
+
+            return (
+              <div
+                key={board.id}
+                data-artboard-frame
+                className="absolute"
+                ref={isActive ? activeBoardFrameRef : null}
+                style={{ left, top, width, height, overflow: "visible" }}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  if (spaceHeldRef.current) return;
+                  if (e.target !== e.currentTarget) return;
+                  e.stopPropagation();
+                  setActiveArtboardId(board.id);
+                  startMarquee(e);
+                }}
+              >
+                <div
+                  className={`absolute bottom-full left-0 right-0 z-20 mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11px] font-medium shadow-sm ${isActive ? "neu-chip-active" : "neu-chip neu-hover-inset"
+                    }`}
+                  onPointerDown={(e) => beginBoardDrag(board, e)}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{board.name}</p>
+                    <p className="text-[10px] uppercase tracking-wide opacity-70">
+                      {board.width} × {board.height} {board.unit}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                    {isDraggingBoard && boardDragRef.current?.boardId === board.id ? "Moving" : "Artboard"}
+                  </span>
+                </div>
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 rounded-sm neu-artboard-shadow"
+                  style={artboardSurfaceStyles(board)}
+                />
+                {boardEls.map((el) => (
+                  <ElementView
+                    key={el.id}
+                    element={el}
+                    scale={displayScale}
+                    isSelected={selectedIds.includes(el.id) && el.artboardId === activeArtboardId}
+                    beginElementDrag={beginElementDrag}
+                    onActivateArtboard={setActiveArtboardId}
+                    onDragMove={handleDragMoveDelta}
+                    onDragEnd={handleDragEnd}
+                    onContextMenu={openElementContextMenu}
+                    canShowResizeHandle={selectedIds.length === 1 && selectedIds[0] === el.id}
+                    panToolActive={spaceHeld}
+                  />
+                ))}
+                {isActive && selectionBounds && selectedIds.length > 1 ? (
+                  <SelectionGroupOverlay
+                    bounds={selectionBounds}
+                    scale={displayScale}
+                    zIndex={selectionOverlayZ}
+                    primaryId={selectedIds[0]}
+                    selectedIds={selectedIds}
+                    panToolActive={spaceHeld}
+                    beginGroupResize={beginGroupResize}
+                    onDragMove={handleDragMoveDelta}
+                    onDragEnd={handleDragEnd}
+                    markGroupAspectBroken={markGroupAspectBroken}
+                  />
+                ) : null}
+                {isActive ? (
+                  <SnapGuides guides={guides} scale={displayScale} boardPxW={width} boardPxH={height} />
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </div>
       {marquee ? (
         <MarqueeOverlay
           marquee={marquee}
           scale={displayScale}
-          boardOffsetPx={marqueeBoardOffset}
+          workspaceOrigin={workspaceOrigin}
+          workspaceOffsetPx={marqueeWorkspaceOffsetPx}
         />
       ) : null}
       {contextMenu ? (
@@ -3921,7 +4302,7 @@ function ArtboardStage({
       ) : null}
       {propertiesOpen ? (
         <ArtboardPropertiesPanel
-          boardRef={boardRef}
+          boardRef={activeBoardFrameRef}
           containerRef={containerRef}
           anchorPx={propertiesAnchorPx}
           onAnchorPxChange={setPropertiesAnchorPx}
@@ -3939,7 +4320,7 @@ function ArtboardStage({
           {selectedElements.length === 0 ? null : singleSelected ? (
             <ElementProperties
               uiScale={PROPERTIES_PANEL_UI_SCALE}
-              artboard={artboard}
+              artboard={activeArtboard}
               element={singleSelected}
               onChange={(patch) => updateElement(singleSelected.id, patch)}
               onReorder={(direction) => reorderLayer(singleSelected.id, direction)}
@@ -4302,14 +4683,14 @@ function ContextMenuDivider() {
   return <div className="my-1 neu-divider" role="separator" />;
 }
 
-function MarqueeOverlay({ marquee, scale, boardOffsetPx }) {
+function MarqueeOverlay({ marquee, scale, workspaceOrigin, workspaceOffsetPx }) {
   return (
     <div
       className="pointer-events-none absolute z-20"
       aria-hidden
       style={{
-        left: boardOffsetPx.left + marquee.x * scale,
-        top: boardOffsetPx.top + marquee.y * scale,
+        left: workspaceOffsetPx.left + (marquee.x - workspaceOrigin.x) * scale,
+        top: workspaceOffsetPx.top + (marquee.y - workspaceOrigin.y) * scale,
         width: marquee.w * scale,
         height: marquee.h * scale,
         background: "rgba(59,130,246,0.1)",
@@ -4545,6 +4926,7 @@ function ElementView({
   scale,
   isSelected,
   beginElementDrag,
+  onActivateArtboard,
   onDragMove,
   onDragEnd,
   onContextMenu,
@@ -4561,7 +4943,8 @@ function ElementView({
     if (panToolActive) return;
     e.preventDefault();
     e.stopPropagation();
-    const started = beginElementDrag(element.id, e, "move");
+    onActivateArtboard?.(element.artboardId);
+    const started = beginElementDrag(element.id, element.artboardId, e, "move");
     if (!started) return;
     try {
       ref.current?.setPointerCapture(e.pointerId);
@@ -4587,7 +4970,8 @@ function ElementView({
     if (panToolActive) return;
     e.preventDefault();
     e.stopPropagation();
-    const started = beginElementDrag(element.id, e, mode);
+    onActivateArtboard?.(element.artboardId);
+    const started = beginElementDrag(element.id, element.artboardId, e, mode);
     if (!started) return;
     if (
       resizeOverridesAspectLock(mode, e.shiftKey) &&

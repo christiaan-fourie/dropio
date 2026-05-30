@@ -61,6 +61,7 @@ export function createShapeElement(shapeKind, board, layer, makeElementId, posit
   return {
     id: makeElementId(),
     type: "shape",
+    artboardId: board.id,
     shapeKind: def.kind,
     name: def.label,
     x,

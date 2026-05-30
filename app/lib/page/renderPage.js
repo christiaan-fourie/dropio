@@ -1,4 +1,6 @@
 import { drawShapeOnCanvas2d } from "./shapes";
+import { boardElements } from "./artboardModel";
+import { createZipBlob } from "../file/zip";
 
 const DEFAULT_DPI = 300;
 const MM_PER_INCH = 25.4;
@@ -80,6 +82,36 @@ export async function renderPageToCanvas({ artboard, elements, dpi = DEFAULT_DPI
 }
 
 export async function generatePagePNG({ artboard, elements, dpi = DEFAULT_DPI }) {
+  if (Array.isArray(artboard)) {
+    const boards = artboard.filter(Boolean);
+    if (boards.length === 0) throw new Error("No artboards provided");
+    if (boards.length === 1) {
+      const single = boards[0];
+      const canvas = await renderPageToCanvas({
+        artboard: single,
+        elements: boardElements(elements, single.id),
+        dpi,
+      });
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG export failed"))), "image/png");
+      });
+      const filename = `${safeFilename(single?.name)}-${single.width}x${single.height}mm-${dpi}dpi.png`;
+      return { blob, filename };
+    }
+    const files = [];
+    for (const board of boards) {
+      const canvas = await renderPageToCanvas({ artboard: board, elements: boardElements(elements, board.id), dpi });
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG export failed"))), "image/png");
+      });
+      files.push({
+        name: `${safeFilename(board?.name)}-${board.width}x${board.height}mm-${dpi}dpi.png`,
+        data: blob,
+      });
+    }
+    return { blob: await createZipBlob(files), filename: `${safeFilename(boards[0]?.name || "artboards")}.zip` };
+  }
+
   const canvas = await renderPageToCanvas({ artboard, elements, dpi });
   const blob = await new Promise((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG export failed"))), "image/png");

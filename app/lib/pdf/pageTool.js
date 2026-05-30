@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { drawShapeOnPdf } from "../page/shapes";
+import { boardElements } from "../page/artboardModel";
 
 const DPI = 300;
 const MM_PER_INCH = 25.4;
@@ -17,71 +18,77 @@ const CUT_LINE_WIDTH_MM = (0.5 * MM_PER_INCH) / 72;
  * upscaled (the best we can do without synthetic detail).
  *
  * @param {Object} args
- * @param {{ name: string, width: number, height: number, unit: "mm" }} args.artboard
+ * @param {Array<{ name: string, width: number, height: number, unit: "mm", background?: string }>} args.artboards
  * @param {Array<{
  *   id: string, type: "image", src: string, name: string,
+ *   artboardId?: string,
  *   x: number, y: number, width: number, height: number, layer: number,
  *   mimeType?: string,
  * }>} args.elements
  * @returns {Promise<{ pdfBytes: ArrayBuffer, filename: string }>}
  */
-export async function generatePagePDF({ artboard, elements }) {
-  if (!artboard) throw new Error("No artboard provided");
+export async function generatePagePDF({ artboards, elements }) {
+  const boards = Array.isArray(artboards) ? artboards.filter(Boolean) : artboards ? [artboards] : [];
+  if (boards.length === 0) throw new Error("No artboards provided");
 
   const pdf = new jsPDF({
-    orientation: artboard.width >= artboard.height ? "landscape" : "portrait",
+    orientation: boards[0].width >= boards[0].height ? "landscape" : "portrait",
     unit: "mm",
-    format: [artboard.width, artboard.height],
+    format: [boards[0].width, boards[0].height],
     compress: true,
   });
 
-  // Render in layer order so the PDF's painter's algorithm matches the editor.
-  const ordered = [...(elements || [])].sort((a, b) => a.layer - b.layer);
+  for (let i = 0; i < boards.length; i++) {
+    const board = boards[i];
+    if (i > 0) {
+      pdf.addPage([board.width, board.height], board.width >= board.height ? "landscape" : "portrait");
+    }
 
-  for (const el of ordered) {
-    if (el.type === "shape") {
-      drawShapeOnPdf(pdf, el);
+    const ordered = [...boardElements(elements, board.id)].sort((a, b) => a.layer - b.layer);
+
+    for (const el of ordered) {
+      if (el.type === "shape") {
+        drawShapeOnPdf(pdf, el);
+        if (el.cutLine) {
+          pdf.setLineWidth(CUT_LINE_WIDTH_MM);
+          pdf.setDrawColor(0, 0, 0);
+          pdf.rect(el.x, el.y, el.width, el.height, "S");
+        }
+        continue;
+      }
+      if (el.type !== "image" || !el.src) continue;
+      const targetPxW = Math.max(1, Math.round(el.width * MM_TO_PX_AT_300_DPI));
+      const targetPxH = Math.max(1, Math.round(el.height * MM_TO_PX_AT_300_DPI));
+      const { dataUrl, format } = await rasterizeAt(el.src, targetPxW, targetPxH, el.mimeType);
+      pdf.addImage(
+        dataUrl,
+        format,
+        el.x,
+        el.y,
+        el.width,
+        el.height,
+        undefined,
+        format === "PNG" ? "FAST" : "NONE"
+      );
       if (el.cutLine) {
         pdf.setLineWidth(CUT_LINE_WIDTH_MM);
         pdf.setDrawColor(0, 0, 0);
         pdf.rect(el.x, el.y, el.width, el.height, "S");
       }
-      continue;
-    }
-    if (el.type !== "image" || !el.src) continue;
-    const targetPxW = Math.max(1, Math.round(el.width * MM_TO_PX_AT_300_DPI));
-    const targetPxH = Math.max(1, Math.round(el.height * MM_TO_PX_AT_300_DPI));
-    const { dataUrl, format } = await rasterizeAt(el.src, targetPxW, targetPxH, el.mimeType);
-    pdf.addImage(
-      dataUrl,
-      format,
-      el.x,
-      el.y,
-      el.width,
-      el.height,
-      undefined,
-      format === "PNG" ? "FAST" : "NONE"
-    );
-    if (el.cutLine) {
-      // Stroke a hairline rectangle on the element's footprint. The stroke is
-      // centered on the path in PDF, so the visible frame lands exactly on the
-      // element's boundary (matching the dashed overlay shown in the editor).
-      pdf.setLineWidth(CUT_LINE_WIDTH_MM);
-      pdf.setDrawColor(0, 0, 0);
-      pdf.rect(el.x, el.y, el.width, el.height, "S");
     }
   }
 
   const pdfBytes = pdf.output("arraybuffer");
   const safeName =
-    (artboard.name || "page")
+    (boards[0].name || "page")
       .replace(/[^a-z0-9-_ ]+/gi, "")
       .trim()
       .replace(/\s+/g, "-") || "page";
+  const suffix = boards.length > 1 ? `-${boards.length}-artboards` : "";
 
   return {
     pdfBytes,
-    filename: `${safeName}-${artboard.width}x${artboard.height}mm-300dpi.pdf`,
+    filename: `${safeName}${suffix}.pdf`,
   };
 }
 

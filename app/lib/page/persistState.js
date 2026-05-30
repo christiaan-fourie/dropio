@@ -6,6 +6,12 @@ import {
   serializeLibraryMetadata,
 } from "./imageLibrary";
 import {
+  ensureActiveArtboardId,
+  normalizeArtboard,
+  normalizeArtboards,
+  normalizeElementArtboardIds,
+} from "./artboardModel";
+import {
   clearLibraryImages,
   getLibraryImage,
   isImageStoreAvailable,
@@ -13,7 +19,7 @@ import {
 } from "./imageStore";
 
 export const STORAGE_KEY = "dropio-state-v1";
-export const STORAGE_VERSION = 2;
+export const STORAGE_VERSION = 3;
 
 export const DEFAULT_CANVAS_WRAP = {
   wrapSize: "A3",
@@ -117,7 +123,7 @@ export function loadPersistedState() {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || (parsed.version !== 1 && parsed.version !== 2)) return null;
+    if (!parsed || (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3)) return null;
     return parsed;
   } catch {
     return null;
@@ -125,7 +131,7 @@ export function loadPersistedState() {
 }
 
 async function buildPersistedSnapshotV2(snapshotInput) {
-  const { library = [], elements = [], canvasWrap, ...rest } = snapshotInput;
+  const { library = [], elements = [], artboards = [], canvasWrap, ...rest } = snapshotInput;
   const libraryIds = library.map((item) => item.id);
   let useImageStore = isImageStoreAvailable();
 
@@ -145,12 +151,16 @@ async function buildPersistedSnapshotV2(snapshotInput) {
     ? serializeLibraryMetadata(library)
     : await serializeLibraryInline(library);
   const serializedCanvasFiles = await serializeCanvasFiles(canvasWrap?.files);
+  const serializedArtboards = (artboards || []).map((board) => ({
+    ...normalizeArtboard(board),
+  }));
 
   return {
-    version: useImageStore ? STORAGE_VERSION : 1,
+    version: STORAGE_VERSION,
     ...rest,
     elements: serializedElements,
     library: serializedLibrary,
+    artboards: serializedArtboards,
     canvasWrap: {
       wrapSize: canvasWrap?.wrapSize ?? DEFAULT_CANVAS_WRAP.wrapSize,
       width: canvasWrap?.width ?? DEFAULT_CANVAS_WRAP.width,
@@ -165,7 +175,8 @@ async function buildPersistedSnapshotV2(snapshotInput) {
 export async function buildPersistedSnapshot(snapshotInput) {
   const {
     viewMode,
-    artboard,
+    artboards,
+    activeArtboardId,
     elements,
     library,
     snapEnabled,
@@ -178,7 +189,8 @@ export async function buildPersistedSnapshot(snapshotInput) {
 
   return buildPersistedSnapshotV2({
     viewMode,
-    artboard,
+    artboards,
+    activeArtboardId,
     elements,
     library,
     snapEnabled,
@@ -237,6 +249,7 @@ export function readInitialEditorState(initialViewMode) {
   const storedElements = stored?.elements ?? null;
   let library = stored?.library ?? [];
   let elements = storedElements;
+  let artboards = normalizeArtboards(stored?.artboards, stored?.artboard);
 
   if (library.length === 0 && storedElements?.length) {
     const migrated = migrateLibraryFromElements(storedElements);
@@ -244,10 +257,14 @@ export function readInitialEditorState(initialViewMode) {
     elements = migrated.elements;
   }
 
+  elements = normalizeElementArtboardIds(elements, artboards);
+  const activeArtboardId = ensureActiveArtboardId(stored?.activeArtboardId, artboards);
+
   return {
     stored,
     viewMode,
-    artboard: stored?.artboard ?? null,
+    artboards,
+    activeArtboardId,
     elements,
     library,
     snapEnabled: stored?.snapEnabled ?? true,

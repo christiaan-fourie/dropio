@@ -51,6 +51,7 @@ export function createElementFromLibraryItem(item, board, layer, makeElementId, 
   return {
     id: makeElementId(),
     type: "image",
+    artboardId: board.id,
     libraryId: item.id,
     src: item.src,
     name: item.name,

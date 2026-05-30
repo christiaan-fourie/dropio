@@ -1,9 +1,10 @@
 export const MAX_UNDO_HISTORY = 50;
 
-export function cloneEditorDocument({ elements, artboard, selectedIds }) {
+export function cloneEditorDocument({ elements, artboards, activeArtboardId, selectedIds }) {
   return {
     elements: (elements || []).map((el) => ({ ...el })),
-    artboard: { ...(artboard || {}) },
+    artboards: (artboards || []).map((board) => ({ ...board })),
+    activeArtboardId,
     selectedIds: [...(selectedIds || [])],
   };
 }
