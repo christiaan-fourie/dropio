@@ -151,6 +151,11 @@ function findPresetKey(width, height) {
   return match ? match.key : "";
 }
 
+function findPresetLabel(width, height) {
+  const match = ARTBOARD_PRESETS.find((p) => p.width === width && p.height === height);
+  return match ? match.label : `${width} × ${height} mm`;
+}
+
 
 
 function clamp(v, min, max) {
@@ -1824,68 +1829,64 @@ function Editor({
 
   const editorSidebarControls = (
     <>
-      <SidebarGroup label="Setup">
+      <SidebarGroup label="Page setup">
         <AccordionSection
           id="artboard"
-          title="Artboard"
+          title="Page"
           icon={FiFileText}
           open={activePanel === "artboard"}
           onToggle={setActivePanel}
-          summary={`${activeArtboard.width} x ${activeArtboard.height} ${activeArtboard.unit}`}
+          summary={`${activeArtboard.name} · ${findPresetLabel(activeArtboard.width, activeArtboard.height)}`}
         >
-          <div className="mb-3 rounded-[var(--radius-sm)] neu-inset p-2">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide neu-text-muted">Projects</p>
-              <button
-                type="button"
-                onClick={addArtboard}
-                className="neu-btn rounded-md px-2 py-1 text-[11px] font-medium"
-              >
-                Add
-              </button>
+          <div className="mb-3 rounded-[var(--radius-sm)] neu-inset p-2.5">
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide neu-text-muted">Pages</p>
+                <p className="truncate text-[10px] neu-text-muted">{artboards.length} page{artboards.length === 1 ? "" : "s"}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={addArtboard}
+                  className="neu-icon-btn inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)]"
+                  aria-label="Add page"
+                  title="Add page"
+                >
+                  <FiPlus className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </div>
             </div>
             <div className="space-y-1.5">
-              {artboards.map((board, index) => (
-                <button
-                  key={board.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveArtboardId(board.id);
-                    setSelectedIds([]);
-                  }}
-                  className={`flex w-full items-start justify-between rounded-md px-2 py-1.5 text-left text-[11px] transition ${board.id === activeArtboardId ? "neu-chip-active" : "neu-chip neu-hover-inset"
-                    }`}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{board.name}</span>
-                    <span className="block text-[10px] neu-text-muted">
-                      {board.width} × {board.height} {board.unit}
+              {artboards.map((board) => {
+                const isActive = board.id === activeArtboardId;
+                return (
+                  <button
+                    key={board.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveArtboardId(board.id);
+                      setSelectedIds([]);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-[var(--radius-sm)] px-2.5 py-2 text-left text-[11px] transition ${isActive ? "border border-[var(--accent)] bg-[var(--info-bg)] neu-text-strong" : "neu-chip neu-hover-inset"
+                      }`}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{board.name}</span>
+                      <span className="block text-[10px] neu-text-muted">
+                        {board.width} × {board.height} {board.unit}
+                      </span>
                     </span>
-                  </span>
-                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide neu-text-muted">
-                    {index + 1}
-                  </span>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={duplicateArtboard}
-                className="neu-btn rounded-md px-2 py-1 text-[11px] font-medium"
-              >
-                Duplicate
-              </button>
-              <button
-                type="button"
-                onClick={() => removeArtboard(activeArtboardId)}
-                className="neu-danger-btn rounded-md px-2 py-1 text-[11px] font-medium"
-                disabled={artboards.length <= 1}
-              >
-                Delete
-              </button>
-            </div>
+            {artboards.length === 1 ? (
+              <p className="mt-2 text-[10px] neu-text-muted">
+                Add another page for a multi-sheet job.
+              </p>
+            ) : null}
           </div>
+          <p className="px-1 text-[10px] font-semibold uppercase tracking-wider neu-text-muted">Active page</p>
           <label className="block text-[11px] font-medium neu-text-muted">
             Name
             <input
@@ -1895,12 +1896,6 @@ function Editor({
               className={`${inputClass} mt-1 py-1.5 text-xs`}
             />
           </label>
-          <div className="rounded-[var(--radius-sm)] neu-inset p-3 text-xs neu-text-muted">
-            <p className="font-semibold neu-text-strong">{activeArtboard.name}</p>
-            <p className="mt-0.5">
-              {activeArtboard.width} × {activeArtboard.height} {activeArtboard.unit}
-            </p>
-          </div>
           <label className="mt-3 block text-[11px] font-medium neu-text-muted">
             Preset
             <select
@@ -1943,6 +1938,7 @@ function Editor({
               />
             </label>
           </div>
+          <p className="mt-4 px-1 text-[10px] font-semibold uppercase tracking-wider neu-text-muted">Canvas</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -1970,7 +1966,27 @@ function Editor({
               aria-pressed={activeArtboard.background !== "transparent"}
               className="inline-flex items-center justify-center neu-btn inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium"
             >
-              {activeArtboard.background === "transparent" ? "Transparent" : "White bg"}
+              {activeArtboard.background === "transparent" ? "Transparent" : "Solid"}
+            </button>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={duplicateArtboard}
+              className="neu-btn inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium"
+            >
+              <FiCopy className="h-3 w-3" />
+              Duplicate page
+            </button>
+            <button
+              type="button"
+              onClick={() => removeArtboard(activeArtboardId)}
+              className="neu-danger-btn inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium"
+              disabled={artboards.length <= 1}
+              title={artboards.length <= 1 ? "Need at least one page" : "Delete active page"}
+            >
+              <FiTrash2 className="h-3 w-3" />
+              Delete
             </button>
           </div>
         </AccordionSection>
@@ -4135,11 +4151,11 @@ function ArtboardStage({
   }, [onLibraryDragOverChange]);
 
   return (
-    <div
+      <div
       ref={containerRef}
       tabIndex={-1}
       role="application"
-      aria-label="Artboard workspace. Scroll to pan, Shift+scroll to pan horizontally, Alt+scroll to zoom. Hold Space to pan with drag."
+      aria-label="Page workspace. Scroll to pan, Shift+scroll to pan horizontally, Alt+scroll to zoom. Hold Space to pan with drag."
       className={`dropio-artboard-workspace relative h-full min-h-0 w-full overflow-hidden rounded-[var(--radius-lg)] neu-workspace p-3 outline-none ${panCursor}`}
       onDragOver={handleLibraryDragOver}
       onDragLeave={handleLibraryDragLeave}
@@ -4224,7 +4240,7 @@ function ArtboardStage({
                     </p>
                   </div>
                   <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide opacity-70">
-                    {isDraggingBoard && boardDragRef.current?.boardId === board.id ? "Moving" : "Artboard"}
+                    {isDraggingBoard && boardDragRef.current?.boardId === board.id ? "Moving" : "Page"}
                   </span>
                 </div>
                 <div
