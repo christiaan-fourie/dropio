@@ -4,7 +4,7 @@ const DEFAULT_ARTBOARD_UNIT = "mm";
 const DEFAULT_ARTBOARD_BACKGROUND = "transparent";
 const DEFAULT_ARTBOARD_WIDTH = 210;
 const DEFAULT_ARTBOARD_HEIGHT = 297;
-const DEFAULT_ARTBOARD_NAME = "Magic";
+const DEFAULT_ARTBOARD_NAME = "Page 1";
 const DEFAULT_ARTBOARD_GAP_MM = 80;
 
 export function makeArtboardId() {
@@ -14,7 +14,7 @@ export function makeArtboardId() {
 export function createDefaultArtboard(index = 0, position = { x: 0, y: 0 }) {
   return {
     id: makeArtboardId(),
-    name: index === 0 ? DEFAULT_ARTBOARD_NAME : `Artboard ${index + 1}`,
+    name: index === 0 ? DEFAULT_ARTBOARD_NAME : `Page ${index + 1}`,
     width: DEFAULT_ARTBOARD_WIDTH,
     height: DEFAULT_ARTBOARD_HEIGHT,
     unit: DEFAULT_ARTBOARD_UNIT,
@@ -28,7 +28,7 @@ export function normalizeArtboard(raw, index = 0, position) {
   if (!raw) return createDefaultArtboard(index, position);
   return {
     id: raw.id || makeArtboardId(),
-    name: raw.name || (index === 0 ? DEFAULT_ARTBOARD_NAME : `Artboard ${index + 1}`),
+    name: raw.name || (index === 0 ? DEFAULT_ARTBOARD_NAME : `Page ${index + 1}`),
     width: Number(raw.width) || DEFAULT_ARTBOARD_WIDTH,
     height: Number(raw.height) || DEFAULT_ARTBOARD_HEIGHT,
     unit: raw.unit || DEFAULT_ARTBOARD_UNIT,

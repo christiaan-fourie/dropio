@@ -1430,7 +1430,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
       const cellW = (board.width - gap * (cols - 1)) / cols;
       const cellH = (board.height - gap * (rows - 1)) / rows;
       if (cellW <= 0 || cellH <= 0) {
-        alert("Gap is too large for this artboard.");
+        alert("Gap is too large for this page.");
         return;
       }
 
@@ -1516,7 +1516,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
     const prev = elementsRef.current.filter((el) => el.artboardId === board.id);
 
     if (prev.length === 0) {
-      alert("Add images to the artboard first.");
+      alert("Add images to the page first.");
       return;
     }
 
@@ -2016,7 +2016,7 @@ function Editor({
             <div className="max-h-48 space-y-2 overflow-auto pr-1">
               {library.length === 0 ? (
                 <p className="text-[11px] leading-relaxed neu-text-muted">
-                  Upload PNG, JPG, GIF, or WebP files to your library, then drag them onto the artboard or use + to add.
+                  Upload PNG, JPG, GIF, or WebP files to your library, then drag them onto the page or use + to add.
                 </p>
               ) : (
                 library.map((item) => (
@@ -2035,7 +2035,7 @@ function Editor({
                         }
                       }}
                       className="flex min-w-0 flex-1 cursor-grab items-center gap-2 px-2 py-1.5 text-left text-[11px] active:cursor-grabbing"
-                      title="Drag onto artboard"
+                      title="Drag onto page"
                     >
                       <img src={item.src} alt="" className="pointer-events-none h-8 w-8 rounded object-cover" draggable={false} />
                       <span className="min-w-0 flex-1 truncate">{item.name}</span>
@@ -2043,8 +2043,8 @@ function Editor({
                     <button
                       type="button"
                       onClick={() => placeFromLibrary(item.id)}
-                      aria-label={`Add ${item.name} to artboard`}
-                      title="Add to artboard"
+                      aria-label={`Add ${item.name} to page`}
+                      title="Add to page"
                       className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md neu-text-muted transition hover:neu-text-strong"
                     >
                       <FiPlus className="h-3.5 w-3.5" />
@@ -2074,7 +2074,7 @@ function Editor({
         >
           <div className="space-y-3 neu-panel rounded-[var(--radius)] p-3">
             <p className="text-[11px] leading-relaxed neu-text-muted">
-              Add vector shapes to the artboard. Adjust fill, stroke, and size in the properties panel.
+              Add vector shapes to the page. Adjust fill, stroke, and size in the properties panel.
             </p>
             <div className="grid grid-cols-3 gap-2">
               {SHAPE_CATALOG.map((shape) => (
@@ -2134,7 +2134,7 @@ function Editor({
             <div className="rounded-[var(--radius-sm)] neu-inset p-2.5">
               <p className="mb-2 text-[11px] font-semibold neu-text-strong">Sheet copies</p>
               <p className="mb-2 text-[10px] leading-relaxed neu-text-muted">
-                Uses selected image, or the first on the artboard.
+                Uses selected image, or the first on the page.
               </p>
               <div className="grid grid-cols-4 gap-1.5">
                 {N_UP_COUNTS.map((n) => (
@@ -2426,7 +2426,7 @@ function Editor({
                     }`,
                 })}
               >
-                <input {...getInputProps()} aria-label="Drop images onto artboard" />
+                <input {...getInputProps()} aria-label="Drop images onto page" />
                 <ArtboardStage
                   artboards={artboards}
                   activeArtboardId={activeArtboardId}
@@ -2487,7 +2487,7 @@ function StageToolbar({
           type="button"
           onClick={alignAndCenter}
           disabled={!canAlign}
-          title="Distribute all elements with equal spacing and center them on the artboard"
+          title="Distribute all elements with equal spacing and center them on the page"
           className={`inline-flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium transition-colors ${canAlign
             ? "neu-btn-primary"
             : "neu-inset cursor-not-allowed neu-text-muted"
@@ -2514,7 +2514,7 @@ function StageToolbar({
         {isZoomDefault ? (
           <span
             className="inline-flex min-w-[2.75rem] justify-center rounded-[var(--radius-sm)] px-2 py-1.5 text-[11px] font-semibold tabular-nums neu-inset neu-text-muted"
-            title="Viewport zoom (Alt+scroll on artboard)"
+            title="Viewport zoom (Alt+scroll on canvas)"
           >
             {zoomPercent}%
           </span>
@@ -2954,7 +2954,7 @@ function MultiSelectionPanel({
           />
         </div>
         <p className="neu-text-muted" style={{ marginTop: uiScale * 1.5, fontSize: uiScale * 2.8 }}>
-          Sets every selected image to the same dimensions. Use the group handles on the artboard to
+          Sets every selected image to the same dimensions. Use the group handles on the page to
           scale together.
         </p>
       </div>
