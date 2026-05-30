@@ -483,7 +483,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [businessSheet, setBusinessSheet] = useState("A4");
-  const [layoutGap, setLayoutGap] = useState(2);
+  const [layoutGap, setLayoutGap] = useState(5);
   const [layoutLockAspect, setLayoutLockAspect] = useState(true);
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
   const [canvasWrap, setCanvasWrap] = useState(() => ({ ...DEFAULT_CANVAS_WRAP, files: [] }));
@@ -700,7 +700,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
       setLibrary(hydratedLibrary);
       setSnapEnabled(boot.snapEnabled);
       setBusinessSheet(boot.businessSheet);
-      setLayoutGap(boot.layoutGap ?? boot.gridGap ?? 2);
+      setLayoutGap(boot.layoutGap ?? boot.gridGap ?? 5);
       setLayoutLockAspect(boot.layoutLockAspect ?? true);
       setViewport(boot.viewport ?? DEFAULT_VIEWPORT);
       if (initialViewMode !== "canvas-wrap" && boot.viewMode) {
@@ -799,7 +799,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
     setActiveArtboardId(defaults[0].id);
     setSnapEnabled(true);
     setBusinessSheet("A4");
-    setLayoutGap(2);
+    setLayoutGap(5);
     setLayoutLockAspect(true);
     setViewport(DEFAULT_VIEWPORT);
     setCanvasWrap({ ...DEFAULT_CANVAS_WRAP, files: [] });
@@ -1414,6 +1414,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
       const board = artboardRef.current;
       const n = clamp(Math.round(Number(count) || 1), 1, 50);
       const gap = clamp(Number(layoutGap) || 0, 0, 100);
+      const margin = gap;
       const lockAspect = layoutLockAspect;
       const source = layoutSourceElement(
         elementsRef.current.filter((el) => el.artboardId === board.id),
@@ -1426,8 +1427,10 @@ export default function PageClient({ initialViewMode = "editor" }) {
       }
 
       const { rows, cols } = bestGridForCount(n, board.width, board.height);
-      const cellW = (board.width - gap * (cols - 1)) / cols;
-      const cellH = (board.height - gap * (rows - 1)) / rows;
+      const innerW = board.width - margin * 2;
+      const innerH = board.height - margin * 2;
+      const cellW = (innerW - gap * (cols - 1)) / cols;
+      const cellH = (innerH - gap * (rows - 1)) / rows;
       if (cellW <= 0 || cellH <= 0) {
         alert("Gap is too large for this page.");
         return;
@@ -1441,8 +1444,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
         arranged.push({
           ...source,
           id: makeId(),
-          x: col * (cellW + gap) + (cellW - width) / 2,
-          y: row * (cellH + gap) + (cellH - height) / 2,
+          x: margin + col * (cellW + gap) + (cellW - width) / 2,
+          y: margin + row * (cellH + gap) + (cellH - height) / 2,
           width,
           height,
           layer: arranged.length,
@@ -1464,6 +1467,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
   const applyFillPage = useCallback(() => {
     const board = artboardRef.current;
     const gap = clamp(Number(layoutGap) || 0, 0, 100);
+    const margin = gap;
     const lockAspect = layoutLockAspect;
     const source = layoutSourceElement(
       elementsRef.current.filter((el) => el.artboardId === board.id),
@@ -1479,12 +1483,14 @@ export default function PageClient({ initialViewMode = "editor" }) {
     const tileH = source.height;
     if (tileW <= 0 || tileH <= 0) return;
 
-    const cols = Math.max(1, Math.floor((board.width + gap) / (tileW + gap)));
-    const rows = Math.max(1, Math.floor((board.height + gap) / (tileH + gap)));
+    const innerW = board.width - margin * 2;
+    const innerH = board.height - margin * 2;
+    const cols = Math.max(1, Math.floor((innerW + gap) / (tileW + gap)));
+    const rows = Math.max(1, Math.floor((innerH + gap) / (tileH + gap)));
     const totalW = cols * tileW + (cols - 1) * gap;
     const totalH = rows * tileH + (rows - 1) * gap;
-    const startX = (board.width - totalW) / 2;
-    const startY = (board.height - totalH) / 2;
+    const startX = margin + Math.max(0, (innerW - totalW) / 2);
+    const startY = margin + Math.max(0, (innerH - totalH) / 2);
 
     const arranged = [];
     for (let row = 0; row < rows; row++) {
@@ -1511,6 +1517,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
   const applyBigAsPossible = useCallback(() => {
     const board = artboardRef.current;
     const gap = clamp(Number(layoutGap) || 0, 0, 100);
+    const margin = gap;
     const lockAspect = layoutLockAspect;
     const prev = elementsRef.current.filter((el) => el.artboardId === board.id);
 
@@ -1524,8 +1531,10 @@ export default function PageClient({ initialViewMode = "editor" }) {
       const sorted = sortElementsReadingOrder(prev);
       const n = sorted.length;
       const { rows, cols } = bestGridForCount(n, board.width, board.height);
-      const cellW = (board.width - gap * (cols - 1)) / cols;
-      const cellH = (board.height - gap * (rows - 1)) / rows;
+      const innerW = board.width - margin * 2;
+      const innerH = board.height - margin * 2;
+      const cellW = (innerW - gap * (cols - 1)) / cols;
+      const cellH = (innerH - gap * (rows - 1)) / rows;
       if (cellW <= 0 || cellH <= 0) return prev;
 
       const updates = new Map();
@@ -1534,8 +1543,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
         const row = Math.floor(i / cols);
         const { width, height } = fitInCell(cellW, cellH, el, lockAspect);
         updates.set(el.id, {
-          x: col * (cellW + gap) + (cellW - width) / 2,
-          y: row * (cellH + gap) + (cellH - height) / 2,
+          x: margin + col * (cellW + gap) + (cellW - width) / 2,
+          y: margin + row * (cellH + gap) + (cellH - height) / 2,
           width,
           height,
           lockAspectRatio: lockAspect ? true : el.lockAspectRatio,

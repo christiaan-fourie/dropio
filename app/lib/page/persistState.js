@@ -269,7 +269,7 @@ export function readInitialEditorState(initialViewMode) {
     library,
     snapEnabled: stored?.snapEnabled ?? true,
     businessSheet: stored?.businessSheet ?? "A4",
-    layoutGap: stored?.layoutGap ?? stored?.gridGap ?? 2,
+    layoutGap: stored?.layoutGap ?? stored?.gridGap ?? 5,
     layoutLockAspect: stored?.layoutLockAspect ?? true,
     viewport: stored?.viewport ?? DEFAULT_VIEWPORT,
     canvasWrapMeta: stored?.canvasWrap
