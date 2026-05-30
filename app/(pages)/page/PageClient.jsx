@@ -118,6 +118,7 @@ const MAX_MM = 3000;
 const SNAP_THRESHOLD_PX = 6;
 const PASTE_OFFSET_MM = 10;
 const LIBRARY_DRAG_MIME = "application/x-dropio-library-id";
+const WORKSPACE_FIT_PADDING_MM = 48;
 
 const ARTBOARD_PRESETS = [
   { key: "A4P", label: "A4 Portrait · 210×297mm", width: 210, height: 297 },
@@ -3329,7 +3330,10 @@ function ArtboardStage({
   const wheelLastTsRef = useRef(0);
 
   const displayScale = fitScale * viewZoom;
-  const workspaceBounds = useMemo(() => artboardBounds(artboards, 160), [artboards]);
+  const workspaceBounds = useMemo(
+    () => artboardBounds(artboards, WORKSPACE_FIT_PADDING_MM),
+    [artboards]
+  );
   const workspaceOrigin = useMemo(
     () => ({ x: workspaceBounds.minX, y: workspaceBounds.minY }),
     [workspaceBounds]
