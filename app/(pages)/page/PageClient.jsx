@@ -117,6 +117,7 @@ const MIN_MM = 20;
 const MAX_MM = 3000;
 const SNAP_THRESHOLD_PX = 6;
 const BOARD_DRAG_START_THRESHOLD_PX = 4;
+const ARTBOARD_COLLISION_GAP_MM = 8;
 const PASTE_OFFSET_MM = 10;
 const LIBRARY_DRAG_MIME = "application/x-dropio-library-id";
 const WORKSPACE_FIT_PADDING_MM = 48;
@@ -3285,6 +3286,74 @@ function isLibraryDragEvent(e) {
   return [...(e.dataTransfer?.types ?? [])].includes(LIBRARY_DRAG_MIME);
 }
 
+function artboardRect(board, position = board) {
+  return {
+    x: position.x,
+    y: position.y,
+    width: board.width,
+    height: board.height,
+  };
+}
+
+function artboardRectsOverlap(a, b) {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
+}
+
+function resolveArtboardDropPosition(movingBoard, proposedPosition, artboards) {
+  const others = artboards.filter((board) => board.id !== movingBoard.id);
+  const proposedRect = artboardRect(movingBoard, proposedPosition);
+  if (!others.some((board) => artboardRectsOverlap(proposedRect, artboardRect(board)))) {
+    return proposedPosition;
+  }
+
+  const candidates = [];
+  const addCandidate = (x, y) => {
+    const candidate = { x, y };
+    const rect = artboardRect(movingBoard, candidate);
+    if (!others.some((board) => artboardRectsOverlap(rect, artboardRect(board)))) {
+      candidates.push(candidate);
+    }
+  };
+
+  for (const board of others) {
+    const centeredY = board.y + (board.height - movingBoard.height) / 2;
+    const centeredX = board.x + (board.width - movingBoard.width) / 2;
+    const rightX = board.x + board.width + ARTBOARD_COLLISION_GAP_MM;
+    const leftX = board.x - movingBoard.width - ARTBOARD_COLLISION_GAP_MM;
+    const belowY = board.y + board.height + ARTBOARD_COLLISION_GAP_MM;
+    const aboveY = board.y - movingBoard.height - ARTBOARD_COLLISION_GAP_MM;
+
+    addCandidate(rightX, proposedPosition.y);
+    addCandidate(rightX, board.y);
+    addCandidate(rightX, centeredY);
+    addCandidate(leftX, proposedPosition.y);
+    addCandidate(leftX, board.y);
+    addCandidate(leftX, centeredY);
+    addCandidate(proposedPosition.x, belowY);
+    addCandidate(board.x, belowY);
+    addCandidate(centeredX, belowY);
+    addCandidate(proposedPosition.x, aboveY);
+    addCandidate(board.x, aboveY);
+    addCandidate(centeredX, aboveY);
+  }
+
+  if (candidates.length === 0) {
+    const rightmost = others.reduce((max, board) => Math.max(max, board.x + board.width), proposedPosition.x);
+    return { x: rightmost + ARTBOARD_COLLISION_GAP_MM, y: proposedPosition.y };
+  }
+
+  return candidates.reduce((best, candidate) => {
+    const bestDistance = (best.x - proposedPosition.x) ** 2 + (best.y - proposedPosition.y) ** 2;
+    const candidateDistance = (candidate.x - proposedPosition.x) ** 2 + (candidate.y - proposedPosition.y) ** 2;
+    return candidateDistance < bestDistance ? candidate : best;
+  });
+}
+
 function ArtboardStage({
   artboards,
   activeArtboardId,
@@ -3326,6 +3395,7 @@ function ArtboardStage({
   const [contextMenu, setContextMenu] = useState(null); // { x, y, elementId, targetIds }
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [isDraggingBoard, setIsDraggingBoard] = useState(false);
+  const [boardDragPreview, setBoardDragPreview] = useState(null);
   const wheelVelocityRef = useRef({ x: 0, y: 0 }); // px / frame impulse (smoothed in rAF)
   const wheelRafRef = useRef(0);
   const wheelLastTsRef = useRef(0);
@@ -4063,52 +4133,66 @@ function ArtboardStage({
         layoutBounds: workspaceBounds,
         fitScale,
         started: false,
+        dxMm: 0,
+        dyMm: 0,
       };
+      setBoardDragPreview(null);
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
         // ignore
       }
     },
-    [setActiveArtboardId]
+    [fitScale, setActiveArtboardId, setSelectedIds, workspaceBounds]
   );
 
-  const onBoardDragMove = useCallback(
+  const onBoardDragMove = useCallback((e) => {
+    const drag = boardDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    if (!drag.started) {
+      const dxPx = e.clientX - drag.startX;
+      const dyPx = e.clientY - drag.startY;
+      if (Math.hypot(dxPx, dyPx) < BOARD_DRAG_START_THRESHOLD_PX) return;
+      drag.started = true;
+      setIsDraggingBoard(true);
+    }
+    const dxMm = (e.clientX - drag.startX) / scaleRef.current;
+    const dyMm = (e.clientY - drag.startY) / scaleRef.current;
+    drag.dxMm = dxMm;
+    drag.dyMm = dyMm;
+    setBoardDragPreview({ boardId: drag.boardId, dxMm, dyMm });
+  }, []);
+
+  const endBoardDrag = useCallback(
     (e) => {
       const drag = boardDragRef.current;
-      if (!drag || drag.pointerId !== e.pointerId) return;
-      if (!drag.started) {
-        const dxPx = e.clientX - drag.startX;
-        const dyPx = e.clientY - drag.startY;
-        if (Math.hypot(dxPx, dyPx) < BOARD_DRAG_START_THRESHOLD_PX) return;
-        drag.started = true;
-        setIsDraggingBoard(true);
+      if (!drag) return;
+      if (e && drag.pointerId !== e.pointerId) return;
+      if (drag.started) {
+        setArtboards((prev) => {
+          const movingBoard = prev.find((board) => board.id === drag.boardId);
+          if (!movingBoard) return prev;
+          const position = resolveArtboardDropPosition(
+            movingBoard,
+            { x: drag.originX + drag.dxMm, y: drag.originY + drag.dyMm },
+            prev
+          );
+          return prev.map((board) =>
+            board.id === drag.boardId ? { ...board, ...position } : board
+          );
+        });
       }
-      const dxMm = (e.clientX - drag.startX) / scaleRef.current;
-      const dyMm = (e.clientY - drag.startY) / scaleRef.current;
-      setArtboards((prev) =>
-        prev.map((board) =>
-          board.id === drag.boardId
-            ? { ...board, x: drag.originX + dxMm, y: drag.originY + dyMm }
-            : board
-        )
-      );
+      boardDragRef.current = null;
+      setBoardDragPreview(null);
+      setIsDraggingBoard(false);
+      try {
+        drag.pointerNode?.releasePointerCapture?.(drag.pointerId);
+      } catch {
+        // ignore
+      }
     },
     [setArtboards]
   );
-
-  const endBoardDrag = useCallback((e) => {
-    const drag = boardDragRef.current;
-    if (!drag) return;
-    if (e && drag.pointerId !== e.pointerId) return;
-    boardDragRef.current = null;
-    setIsDraggingBoard(false);
-    try {
-      drag.pointerNode?.releasePointerCapture?.(drag.pointerId);
-    } catch {
-      // ignore
-    }
-  }, []);
 
   const panCursor = isPanning ? "cursor-grabbing" : spaceHeld ? "cursor-grab" : "";
 
@@ -4223,8 +4307,11 @@ function ArtboardStage({
         >
           {artboards.map((board) => {
             const isActive = board.id === activeArtboardId;
-            const left = (board.x - workspaceOrigin.x) * displayScale;
-            const top = (board.y - workspaceOrigin.y) * displayScale;
+            const dragPreview = boardDragPreview?.boardId === board.id ? boardDragPreview : null;
+            const previewX = board.x + (dragPreview?.dxMm ?? 0);
+            const previewY = board.y + (dragPreview?.dyMm ?? 0);
+            const left = (previewX - workspaceOrigin.x) * displayScale;
+            const top = (previewY - workspaceOrigin.y) * displayScale;
             const width = board.width * displayScale;
             const height = board.height * displayScale;
             const boardEls = boardElements(elements, board.id).sort((a, b) => a.layer - b.layer);
