@@ -217,6 +217,37 @@ function sortElementsReadingOrder(elements) {
   });
 }
 
+function buildBigAsPossibleUpdates(board, elements, gap, lockAspect) {
+  const current = (elements || []).filter((el) => el.artboardId === board?.id);
+  if (current.length === 0) return null;
+
+  const sorted = sortElementsReadingOrder(current);
+  const n = sorted.length;
+  const { rows, cols } = bestGridForCount(n, board.width, board.height);
+  const margin = gap;
+  const innerW = board.width - margin * 2;
+  const innerH = board.height - margin * 2;
+  const cellW = (innerW - gap * (cols - 1)) / cols;
+  const cellH = (innerH - gap * (rows - 1)) / rows;
+  if (cellW <= 0 || cellH <= 0) return null;
+
+  const updates = new Map();
+  sorted.forEach((el, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const { width, height } = fitInCell(cellW, cellH, el, lockAspect);
+    updates.set(el.id, {
+      x: margin + col * (cellW + gap) + (cellW - width) / 2,
+      y: margin + row * (cellH + gap) + (cellH - height) / 2,
+      width,
+      height,
+      lockAspectRatio: lockAspect ? true : el.lockAspectRatio,
+    });
+  });
+
+  return updates;
+}
+
 function resizeBoxWithLockedAspect(origin, dxMm, dyMm) {
   const ratio = origin.width / origin.height || 1;
   const scaleX = (origin.width + dxMm) / origin.width;
@@ -592,6 +623,38 @@ export default function PageClient({ initialViewMode = "editor" }) {
       });
     },
     [pushUndoSnapshot]
+  );
+
+  const updatePageProperties = useCallback(
+    (next) => {
+      const current = artboardRef.current;
+      if (!current) return;
+      const patch = typeof next === "function" ? next(current) : next;
+      const merged = { ...current, ...patch, id: current.id };
+      const sizeChanged = merged.width !== current.width || merged.height !== current.height;
+      const gap = clamp(Number(layoutGap) || 0, 0, 100);
+      const lockAspect = layoutLockAspect;
+      const resolvedPosition = resolveArtboardDropPosition(
+        merged,
+        { x: merged.x ?? current.x, y: merged.y ?? current.y },
+        artboardsRef.current
+      );
+      const nextBoard = { ...merged, ...resolvedPosition, id: current.id };
+
+      pushUndoSnapshot();
+      setArtboards((prev) =>
+        prev.map((board) => (board.id === current.id ? { ...board, ...nextBoard, id: board.id } : board))
+      );
+
+      if (sizeChanged) {
+        setElements((prev) => {
+          const updates = buildBigAsPossibleUpdates(nextBoard, prev, gap, lockAspect);
+          if (!updates) return prev;
+          return prev.map((el) => (updates.has(el.id) ? { ...el, ...updates.get(el.id) } : el));
+        });
+      }
+    },
+    [artboardRef, layoutGap, layoutLockAspect, pushUndoSnapshot]
   );
 
   const replaceBoardElements = useCallback((boardId, nextElements) => {
@@ -1517,7 +1580,6 @@ export default function PageClient({ initialViewMode = "editor" }) {
   const applyBigAsPossible = useCallback(() => {
     const board = artboardRef.current;
     const gap = clamp(Number(layoutGap) || 0, 0, 100);
-    const margin = gap;
     const lockAspect = layoutLockAspect;
     const prev = elementsRef.current.filter((el) => el.artboardId === board.id);
 
@@ -1528,29 +1590,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
 
     pushUndoSnapshot();
     setElements(() => {
-      const sorted = sortElementsReadingOrder(prev);
-      const n = sorted.length;
-      const { rows, cols } = bestGridForCount(n, board.width, board.height);
-      const innerW = board.width - margin * 2;
-      const innerH = board.height - margin * 2;
-      const cellW = (innerW - gap * (cols - 1)) / cols;
-      const cellH = (innerH - gap * (rows - 1)) / rows;
-      if (cellW <= 0 || cellH <= 0) return prev;
-
-      const updates = new Map();
-      sorted.forEach((el, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const { width, height } = fitInCell(cellW, cellH, el, lockAspect);
-        updates.set(el.id, {
-          x: margin + col * (cellW + gap) + (cellW - width) / 2,
-          y: margin + row * (cellH + gap) + (cellH - height) / 2,
-          width,
-          height,
-          lockAspectRatio: lockAspect ? true : el.lockAspectRatio,
-        });
-      });
-
+      const updates = buildBigAsPossibleUpdates(board, prev, gap, lockAspect);
+      if (!updates) return prev;
       return elementsRef.current.map((p) =>
         p.artboardId === board.id && updates.has(p.id) ? { ...p, ...updates.get(p.id) } : p
       );
@@ -1653,6 +1694,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
         setActiveArtboardId={setActiveArtboardId}
         setArtboards={setArtboards}
         updateActiveArtboard={updateActiveArtboard}
+        updatePageProperties={updatePageProperties}
         addArtboard={addArtboard}
         duplicateArtboard={duplicateArtboard}
         removeArtboard={removeArtboard}
@@ -1718,6 +1760,7 @@ function Editor({
   setActiveArtboardId,
   setArtboards,
   updateActiveArtboard,
+  updatePageProperties,
   addArtboard,
   duplicateArtboard,
   removeArtboard,
@@ -1903,7 +1946,7 @@ function Editor({
             <input
               type="text"
               value={activeArtboard.name}
-              onChange={(e) => updateActiveArtboard({ ...activeArtboard, name: e.target.value })}
+              onChange={(e) => updatePageProperties({ name: e.target.value })}
               className={`${inputClass} mt-1 py-1.5 text-xs`}
             />
           </label>
@@ -1914,7 +1957,7 @@ function Editor({
               onChange={(e) => {
                 const preset = ARTBOARD_PRESETS.find((p) => p.key === e.target.value);
                 if (preset) {
-                  updateActiveArtboard({ ...activeArtboard, width: preset.width, height: preset.height });
+                  updatePageProperties({ width: preset.width, height: preset.height });
                 }
               }}
               className={`${inputClass} mt-1 py-1.5 text-xs font-medium`}
@@ -1934,7 +1977,7 @@ function Editor({
                 value={activeArtboard.width}
                 min={MIN_MM}
                 max={MAX_MM}
-                onCommit={(v) => updateActiveArtboard((prev) => ({ ...prev, width: v }))}
+                onCommit={(v) => updatePageProperties((prev) => ({ ...prev, width: v }))}
                 className={`${inputClass} mt-1 py-1.5 text-xs`}
               />
             </label>
@@ -1944,7 +1987,7 @@ function Editor({
                 value={activeArtboard.height}
                 min={MIN_MM}
                 max={MAX_MM}
-                onCommit={(v) => updateActiveArtboard((prev) => ({ ...prev, height: v }))}
+                onCommit={(v) => updatePageProperties((prev) => ({ ...prev, height: v }))}
                 className={`${inputClass} mt-1 py-1.5 text-xs`}
               />
             </label>
@@ -1954,8 +1997,7 @@ function Editor({
             <button
               type="button"
               onClick={() =>
-                updateActiveArtboard({
-                  ...activeArtboard,
+                updatePageProperties({
                   width: activeArtboard.height,
                   height: activeArtboard.width,
                 })
@@ -1968,10 +2010,8 @@ function Editor({
             <button
               type="button"
               onClick={() =>
-                updateActiveArtboard({
-                  ...activeArtboard,
-                  background:
-                    activeArtboard.background === "transparent" ? "#ffffff" : "transparent",
+                updatePageProperties({
+                  background: activeArtboard.background === "transparent" ? "#ffffff" : "transparent",
                 })
               }
               aria-pressed={activeArtboard.background !== "transparent"}
@@ -2461,6 +2501,7 @@ function Editor({
                   snapEnabled={snapEnabled}
                   viewport={viewport}
                   setViewport={setViewport}
+                  updatePageProperties={updatePageProperties}
                   addArtboard={addArtboard}
                   duplicateArtboard={duplicateArtboard}
                   removeArtboard={removeArtboard}
@@ -2908,6 +2949,121 @@ function ElementProperties({ element, artboard, onChange, onReorder, onDelete, u
           {element.cutLine ? "On" : "Off"}
         </span>
       </button>
+    </div>
+  );
+}
+
+function PageProperties({ artboard, onChange, onDuplicate, onDelete, canDelete, uiScale = 1 }) {
+  const icon = propertiesIconSize(uiScale);
+  const ctrl = propertiesControlStyle(uiScale);
+  const gap = uiScale * 2;
+  const sectionGap = uiScale * 3;
+
+  if (!artboard) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: sectionGap }}>
+      <label className="block text-[11px] font-medium neu-text-muted">
+        Name
+        <input
+          type="text"
+          value={artboard.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          className={`${inputClass} mt-1 py-1.5 text-xs`}
+        />
+      </label>
+
+      <label className="block text-[11px] font-medium neu-text-muted">
+        Preset
+        <select
+          value={findPresetKey(artboard.width, artboard.height)}
+          onChange={(e) => {
+            const preset = ARTBOARD_PRESETS.find((p) => p.key === e.target.value);
+            if (preset) {
+              onChange({ width: preset.width, height: preset.height });
+            }
+          }}
+          className={`${inputClass} mt-1 py-1.5 text-xs font-medium`}
+        >
+          <option value="">Custom</option>
+          {ARTBOARD_PRESETS.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="grid grid-cols-2" style={{ gap }}>
+        <NumField
+          uiScale={uiScale}
+          label="Width (mm)"
+          value={artboard.width}
+          min={MIN_MM}
+          onChange={(v) => onChange({ width: Math.max(MIN_MM, v) })}
+        />
+        <NumField
+          uiScale={uiScale}
+          label="Height (mm)"
+          value={artboard.height}
+          min={MIN_MM}
+          onChange={(v) => onChange({ height: Math.max(MIN_MM, v) })}
+        />
+      </div>
+
+      <div className="grid grid-cols-2" style={{ gap }}>
+        <button
+          type="button"
+          onClick={() =>
+            onChange({
+              width: artboard.height,
+              height: artboard.width,
+            })
+          }
+          className="neu-btn inline-flex items-center justify-center font-medium"
+          style={ctrl}
+        >
+          <FiRotateCw style={{ width: icon, height: icon, flexShrink: 0 }} />
+          Rotate
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onChange({
+              background: artboard.background === "transparent" ? "#ffffff" : "transparent",
+            })
+          }
+          aria-pressed={artboard.background !== "transparent"}
+          className="neu-btn inline-flex items-center justify-center font-medium"
+          style={ctrl}
+        >
+          {artboard.background === "transparent" ? "Transparent" : "Solid"}
+        </button>
+      </div>
+
+      <div className="flex items-center" style={{ gap }}>
+        <button
+          type="button"
+          onClick={onDuplicate}
+          className="neu-btn inline-flex flex-1 items-center justify-center font-medium"
+          style={ctrl}
+          title="Duplicate page"
+        >
+          <FiCopy style={{ width: icon, height: icon, flexShrink: 0 }} />
+          Duplicate
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={!canDelete}
+          className="neu-danger-btn inline-flex items-center justify-center font-medium"
+          style={ctrl}
+          title={canDelete ? "Delete page" : "Need at least one page"}
+          aria-label="Delete page"
+        >
+          <FiTrash2 style={{ width: icon, height: icon, flexShrink: 0 }} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -3391,6 +3547,8 @@ function ArtboardStage({
   snapEnabled,
   viewport,
   setViewport,
+  updateActiveArtboard,
+  updatePageProperties,
   addArtboard,
   duplicateArtboard,
   removeArtboard,
@@ -3409,6 +3567,8 @@ function ArtboardStage({
   const [contextMenu, setContextMenu] = useState(null); // { x, y, elementId, targetIds }
   const [pageContextMenu, setPageContextMenu] = useState(null); // { x, y, boardId }
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [propertiesMode, setPropertiesMode] = useState("selection");
+  const [propertiesBoardId, setPropertiesBoardId] = useState(null);
   const [isDraggingBoard, setIsDraggingBoard] = useState(false);
   const [boardDragPreview, setBoardDragPreview] = useState(null);
   const wheelVelocityRef = useRef({ x: 0, y: 0 }); // px / frame impulse (smoothed in rAF)
@@ -3693,16 +3853,37 @@ function ArtboardStage({
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const closePageContextMenu = useCallback(() => setPageContextMenu(null), []);
-  const closePropertiesPanel = useCallback(() => setPropertiesOpen(false), []);
+  const closePropertiesPanel = useCallback(() => {
+    setPropertiesOpen(false);
+    setPropertiesMode("selection");
+    setPropertiesBoardId(null);
+  }, []);
   /** Top-left position in workspace pixels; null = default beside the artboard */
   const [propertiesAnchorPx, setPropertiesAnchorPx] = useState(null);
 
   const openPropertiesPanel = useCallback(() => {
     setContextMenu(null);
     setPageContextMenu(null);
+    setPropertiesMode("selection");
+    setPropertiesBoardId(null);
     setPropertiesAnchorPx(null);
     setPropertiesOpen(true);
   }, []);
+
+  const openPagePropertiesPanel = useCallback(
+    (board) => {
+      if (!board) return;
+      setContextMenu(null);
+      setPageContextMenu(null);
+      setPropertiesMode("page");
+      setPropertiesBoardId(board.id);
+      setPropertiesAnchorPx(null);
+      setPropertiesOpen(true);
+      setActiveArtboardId(board.id);
+      setSelectedIds([]);
+    },
+    [setActiveArtboardId, setSelectedIds]
+  );
 
   const openPageContextMenu = useCallback(
     (board, e) => {
@@ -4476,6 +4657,11 @@ function ArtboardStage({
           menu={pageContextMenu}
           artboards={artboards}
           onClose={closePageContextMenu}
+          onProperties={() =>
+            runPageMenuAction(() => openPagePropertiesPanel(
+              artboards.find((board) => board.id === pageContextMenu.boardId) ?? activeArtboard
+            ))
+          }
           onAddPage={() => runPageMenuAction(() => addArtboard())}
           onDuplicatePage={() => runPageMenuAction(() => duplicateArtboard())}
           onDeletePage={() => runPageMenuAction(() => removeArtboard(pageContextMenu.boardId))}
@@ -4488,17 +4674,30 @@ function ArtboardStage({
           anchorPx={propertiesAnchorPx}
           onAnchorPxChange={setPropertiesAnchorPx}
           onClose={closePropertiesPanel}
-          title="Properties"
+          title={propertiesMode === "page" ? "Page properties" : "Properties"}
           subtitle={
-            selectedElements.length === 0
-              ? null
-              : singleSelected
-                ? singleSelected.name
-                : `${selectedElements.length} selected`
+            propertiesMode === "page"
+              ? (artboards.find((board) => board.id === propertiesBoardId) ?? activeArtboard)?.name ?? null
+              : selectedElements.length === 0
+                ? null
+                : singleSelected
+                  ? singleSelected.name
+                  : `${selectedElements.length} selected`
           }
           layoutKey={`${pan.x}-${pan.y}-${viewZoom}-${fitScale}-${boardPxW}-${boardPxH}`}
         >
-          {selectedElements.length === 0 ? null : singleSelected ? (
+          {propertiesMode === "page" ? (
+            <PageProperties
+              uiScale={PROPERTIES_PANEL_UI_SCALE}
+              artboard={artboards.find((board) => board.id === propertiesBoardId) ?? activeArtboard}
+              onChange={(patch) => updatePageProperties(patch)}
+              onDuplicate={() => duplicateArtboard(artboards.find((board) => board.id === propertiesBoardId) ?? activeArtboard)}
+              onDelete={() =>
+                removeArtboard(propertiesBoardId ?? activeArtboardId)
+              }
+              canDelete={artboards.length > 1}
+            />
+          ) : selectedElements.length === 0 ? null : singleSelected ? (
             <ElementProperties
               uiScale={PROPERTIES_PANEL_UI_SCALE}
               artboard={activeArtboard}
@@ -4839,6 +5038,7 @@ function PageContextMenu({
   menu,
   artboards,
   onClose,
+  onProperties,
   onAddPage,
   onDuplicatePage,
   onDeletePage,
@@ -4890,6 +5090,8 @@ function PageContextMenu({
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={(e) => e.stopPropagation()}
     >
+      <ContextMenuItem icon={FiSliders} label="Properties" onClick={onProperties} />
+      <ContextMenuDivider />
       <ContextMenuItem icon={FiPlus} label="Add page" onClick={onAddPage} />
       <ContextMenuItem icon={FiCopy} label="Duplicate page" onClick={onDuplicatePage} />
       <ContextMenuDivider />
