@@ -116,6 +116,7 @@ import { SHAPE_CATALOG, createShapeElement } from "@/app/lib/page/shapes";
 const MIN_MM = 20;
 const MAX_MM = 3000;
 const SNAP_THRESHOLD_PX = 6;
+const BOARD_DRAG_START_THRESHOLD_PX = 4;
 const PASTE_OFFSET_MM = 10;
 const LIBRARY_DRAG_MIME = "application/x-dropio-library-id";
 const WORKSPACE_FIT_PADDING_MM = 48;
@@ -4061,8 +4062,8 @@ function ArtboardStage({
         pointerNode: e.currentTarget,
         layoutBounds: workspaceBounds,
         fitScale,
+        started: false,
       };
-      setIsDraggingBoard(true);
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -4076,6 +4077,13 @@ function ArtboardStage({
     (e) => {
       const drag = boardDragRef.current;
       if (!drag || drag.pointerId !== e.pointerId) return;
+      if (!drag.started) {
+        const dxPx = e.clientX - drag.startX;
+        const dyPx = e.clientY - drag.startY;
+        if (Math.hypot(dxPx, dyPx) < BOARD_DRAG_START_THRESHOLD_PX) return;
+        drag.started = true;
+        setIsDraggingBoard(true);
+      }
       const dxMm = (e.clientX - drag.startX) / scaleRef.current;
       const dyMm = (e.clientY - drag.startY) / scaleRef.current;
       setArtboards((prev) =>
