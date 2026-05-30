@@ -1,6 +1,6 @@
 # Dropio
 
-**Dropio** is a local-first, browser-based print layout editor for print shops and designers. Drop artwork onto a millimeter artboard, arrange it with drag-and-resize, run sheet automations (business cards, repeat grids), and export **PDF** or **PNG**—all in the browser, with no upload-to-server step.
+**Dropio** is a local-first, browser-based print layout editor for print shops and designers. Drop artwork onto millimeter-based pages, arrange it with drag-and-resize, run sheet automations (business cards, repeat grids), and export **PDF** or **PNG** - all in the browser, with no upload-to-server step.
 
 A separate **Canvas Wrap** tool (`/canvas-wrap`) handles gallery-wrap jobs with frame-depth bleed math and its own PDF export.
 
@@ -10,7 +10,7 @@ The app is built with [Next.js](https://nextjs.org) (App Router), [React](https:
 
 | Surface | Route | Purpose |
 |---------|--------|---------|
-| **Dropio editor** | `/` | Artboard-based layout: drop images, move/resize with snapping, multi-select, cut lines, business-card and repeat-grid automations, **PDF** (300 DPI) and **PNG** export. |
+| **Dropio editor** | `/` | Page-based layout: drop images, move/resize with snapping, multi-select, page header context menu, page properties, cut lines, business-card and repeat-grid automations, **PDF** (300 DPI) and **PNG** export. |
 | **Canvas wrap** | `/canvas-wrap` | Gallery-wrap export: image fitted to the printable block (**face + wrap-side bleed** from frame depth and extra margin), centered on the parent sheet; live preview matches export geometry. |
 
 ### Legacy URL redirects
@@ -29,12 +29,13 @@ Business-card sheet layout is built into the editor's **Automations** panel (90�
 
 ## Editor features
 
-- **Custom artboards** — Presets (A4, A3, A2, US Letter, squares, poster) or manual width/height in mm; optional white or transparent background.
-- **Image placement** — Drag, resize, layer order, marquee and multi-select, copy/paste/duplicate, snap guides to artboard and other elements.
+- **Custom pages** — Presets (A4, A3, A2, US Letter, squares, poster) or manual width/height in mm; optional white or transparent background. The default page is named `Page 1`, `Page 2`, and so on.
+- **Page interactions** — Drag pages without viewport jitter, right-click page headers for actions, open page properties directly, and Alt-drag a page header to duplicate it.
+- **Image placement** — Drag, resize, layer order, marquee and multi-select, copy/paste/duplicate, snap guides to the active page and other elements.
 - **Cut lines** — Optional 0.5pt cutting-line overlay per element, included in PDF export.
 - **Automations**
-  - **Business cards** — Fill an A4 (10-up) or A3 (24-up) sheet from selected artwork at 90×50mm with 1mm spacing.
-  - **Repeat grid** — Tile artwork in a configurable rows × cols grid with gap.
+  - **Business cards** — Fill an A4 (10-up) or A3 (24-up) page from selected artwork at 90×50mm with 5mm page margins and spacing.
+  - **Repeat grid** — Tile artwork in a configurable rows × cols grid with gap; automation respects page margins.
 - **Export**
   - **PDF** — 300 DPI rasterization via jsPDF (`pageTool.js`).
   - **PNG** — 300 DPI raster export with optional transparent background (`renderPage.js`).
@@ -97,7 +98,7 @@ app/
 
 ## Prepress note
 
-All geometry is **millimeter-based**. **Canvas wrap** models **gallery-wrap bleed** from frame thickness and extra margin. **Business-card automation** in the editor uses **trim size only** (90×50mm, no bleed field). PDF and PNG export rasterize images to **300 DPI** at the element's physical size on the artboard. Embedded images are passed through from uploads; for commercial offset or wide-gamut ink, prepare **resolution and color** in source artwork and use your normal RIP or PDF workflow—this app does not perform **CMYK separation**.
+All geometry is **millimeter-based**. **Canvas wrap** models **gallery-wrap bleed** from frame thickness and extra margin. **Business-card automation** in the editor uses **trim size only** (90×50mm, no bleed field) and now respects the default page gap/margin. PDF and PNG export rasterize images to **300 DPI** at the element's physical size on the page. Embedded images are passed through from uploads; for commercial offset or wide-gamut ink, prepare **resolution and color** in source artwork and use your normal RIP or PDF workflow - this app does not perform **CMYK separation**.
 
 ## Learn more
 
