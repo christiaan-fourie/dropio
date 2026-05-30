@@ -611,12 +611,11 @@ export default function PageClient({ initialViewMode = "editor" }) {
     setSelectedIds([]);
   }, [pushUndoSnapshot]);
 
-  const duplicateArtboard = useCallback(() => {
-    const current = artboardRef.current;
+  const duplicateArtboard = useCallback((current = artboardRef.current, options = {}) => {
     if (!current) return;
     pushUndoSnapshot();
     const boards = artboardsRef.current;
-    const offset = nextBoardPosition(boards, current.width);
+    const offset = options.position ?? nextBoardPosition(boards, current.width);
     const { id: clonedId } = createDefaultArtboard(boards.length, offset);
     const cloned = {
       ...current,
@@ -632,6 +631,7 @@ export default function PageClient({ initialViewMode = "editor" }) {
     setElements((prev) => [...prev, ...clonedElements]);
     setActiveArtboardId(cloned.id);
     setSelectedIds(clonedElements.map((el) => el.id));
+    return { board: cloned, elementIds: clonedElements.map((el) => el.id) };
   }, [pushUndoSnapshot]);
 
   const removeArtboard = useCallback(
@@ -2461,6 +2461,9 @@ function Editor({
                   snapEnabled={snapEnabled}
                   viewport={viewport}
                   setViewport={setViewport}
+                  addArtboard={addArtboard}
+                  duplicateArtboard={duplicateArtboard}
+                  removeArtboard={removeArtboard}
                   placeFromLibrary={placeFromLibrary}
                   onLibraryDragOverChange={setLibraryDragOver}
                 />
@@ -3388,6 +3391,9 @@ function ArtboardStage({
   snapEnabled,
   viewport,
   setViewport,
+  addArtboard,
+  duplicateArtboard,
+  removeArtboard,
   placeFromLibrary,
   onLibraryDragOverChange,
 }) {
@@ -3401,6 +3407,7 @@ function ArtboardStage({
   const [guides, setGuides] = useState({ xs: [], ys: [] });
   const [marquee, setMarquee] = useState(null); // { x, y, w, h } in mm during marquee drag
   const [contextMenu, setContextMenu] = useState(null); // { x, y, elementId, targetIds }
+  const [pageContextMenu, setPageContextMenu] = useState(null); // { x, y, boardId }
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [isDraggingBoard, setIsDraggingBoard] = useState(false);
   const [boardDragPreview, setBoardDragPreview] = useState(null);
@@ -3685,21 +3692,41 @@ function ArtboardStage({
   }, [selectedElements]);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const closePageContextMenu = useCallback(() => setPageContextMenu(null), []);
   const closePropertiesPanel = useCallback(() => setPropertiesOpen(false), []);
   /** Top-left position in workspace pixels; null = default beside the artboard */
   const [propertiesAnchorPx, setPropertiesAnchorPx] = useState(null);
 
   const openPropertiesPanel = useCallback(() => {
     setContextMenu(null);
+    setPageContextMenu(null);
     setPropertiesAnchorPx(null);
     setPropertiesOpen(true);
   }, []);
+
+  const openPageContextMenu = useCallback(
+    (board, e) => {
+      if (spaceHeldRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu(null);
+      setActiveArtboardId(board.id);
+      setSelectedIds([]);
+      setPageContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        boardId: board.id,
+      });
+    },
+    [setActiveArtboardId, setSelectedIds]
+  );
 
   const openElementContextMenu = useCallback(
     (elementId, e) => {
       if (spaceHeldRef.current) return;
       e.preventDefault();
       e.stopPropagation();
+      setPageContextMenu(null);
       const element = elementsRef.current.find((item) => item.id === elementId);
       if (element?.artboardId && element.artboardId !== activeArtboardIdRef.current) {
         setActiveArtboardId(element.artboardId);
@@ -3728,6 +3755,11 @@ function ArtboardStage({
   const runMenuAction = useCallback((action) => {
     action();
     setContextMenu(null);
+  }, []);
+
+  const runPageMenuAction = useCallback((action) => {
+    action();
+    setPageContextMenu(null);
   }, []);
 
   // Called by each ElementView at pointerdown. Updates the selection based on
@@ -4128,15 +4160,25 @@ function ArtboardStage({
       if (spaceHeldRef.current || e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
-      setActiveArtboardId(board.id);
-      setSelectedIds([]);
+
+      const sourceBoard = board;
+      const draggedBoard = e.altKey
+        ? duplicateArtboard(sourceBoard, { position: { x: sourceBoard.x, y: sourceBoard.y } })?.board
+        : sourceBoard;
+
+      if (!draggedBoard) return;
+
+      setActiveArtboardId(draggedBoard.id);
+      if (!e.altKey) {
+        setSelectedIds([]);
+      }
       boardDragRef.current = {
-        boardId: board.id,
+        boardId: draggedBoard.id,
         pointerId: e.pointerId,
         startX: e.clientX,
         startY: e.clientY,
-        originX: board.x,
-        originY: board.y,
+        originX: draggedBoard.x,
+        originY: draggedBoard.y,
         pointerNode: e.currentTarget,
         layoutBounds: workspaceBounds,
         fitScale,
@@ -4151,7 +4193,7 @@ function ArtboardStage({
         // ignore
       }
     },
-    [fitScale, setActiveArtboardId, setSelectedIds, workspaceBounds]
+    [duplicateArtboard, fitScale, setActiveArtboardId, setSelectedIds, workspaceBounds]
   );
 
   const onBoardDragMove = useCallback((e) => {
@@ -4344,6 +4386,7 @@ function ArtboardStage({
                   className={`absolute bottom-full left-0 right-0 z-20 mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11px] font-medium shadow-sm ${isActive ? "neu-chip-active" : "neu-chip neu-hover-inset"
                     }`}
                   onPointerDown={(e) => beginBoardDrag(board, e)}
+                  onContextMenu={(e) => openPageContextMenu(board, e)}
                 >
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{board.name}</p>
@@ -4426,6 +4469,16 @@ function ArtboardStage({
           onToggleLockAspect={() =>
             runMenuAction(() => toggleLockAspectRatioForElements(contextMenu.targetIds))
           }
+        />
+      ) : null}
+      {pageContextMenu ? (
+        <PageContextMenu
+          menu={pageContextMenu}
+          artboards={artboards}
+          onClose={closePageContextMenu}
+          onAddPage={() => runPageMenuAction(() => addArtboard())}
+          onDuplicatePage={() => runPageMenuAction(() => duplicateArtboard())}
+          onDeletePage={() => runPageMenuAction(() => removeArtboard(pageContextMenu.boardId))}
         />
       ) : null}
       {propertiesOpen ? (
@@ -4778,6 +4831,83 @@ function ElementContextMenu({
       />
       <ContextMenuDivider />
       <ContextMenuItem icon={FiTrash2} label={`Delete${suffix}`} shortcut="Del" danger onClick={onDelete} />
+    </div>
+  );
+}
+
+function PageContextMenu({
+  menu,
+  artboards,
+  onClose,
+  onAddPage,
+  onDuplicatePage,
+  onDeletePage,
+}) {
+  const menuRef = useRef(null);
+  const [position, setPosition] = useState({ x: menu.x, y: menu.y });
+  const board = artboards.find((item) => item.id === menu.boardId) ?? null;
+  const canDelete = artboards.length > 1;
+
+  useLayoutEffect(() => {
+    const node = menuRef.current;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    const pad = 8;
+    const x = Math.min(menu.x, window.innerWidth - rect.width - pad);
+    const y = Math.min(menu.y, window.innerHeight - rect.height - pad);
+    setPosition({ x: Math.max(pad, x), y: Math.max(pad, y) });
+  }, [menu.x, menu.y]);
+
+  useEffect(() => {
+    const onPointerDown = (e) => {
+      if (menuRef.current?.contains(e.target)) return;
+      onClose();
+    };
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    const onScroll = () => onClose();
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onClose);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onClose);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label="Page actions"
+      data-artboard-context-menu
+      className="neu-context-menu fixed z-50 min-w-[200px] overflow-hidden rounded-[var(--radius-sm)] py-1"
+      style={{ left: position.x, top: position.y }}
+      onContextMenu={(e) => e.preventDefault()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <ContextMenuItem icon={FiPlus} label="Add page" onClick={onAddPage} />
+      <ContextMenuItem icon={FiCopy} label="Duplicate page" onClick={onDuplicatePage} />
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={FiTrash2}
+        label="Delete page"
+        danger
+        disabled={!canDelete}
+        onClick={onDeletePage}
+      />
+      {board ? (
+        <>
+          <ContextMenuDivider />
+          <div className="px-3 py-2 text-[11px] neu-text-muted">
+            {board.name}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
