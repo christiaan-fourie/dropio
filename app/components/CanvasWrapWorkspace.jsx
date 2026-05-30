@@ -13,6 +13,7 @@ import {
   FiAlertTriangle,
 } from "react-icons/fi";
 import RenderFrame from "@/app/components/RenderFrame";
+import DraftNumberField from "@/app/components/DraftNumberField";
 import { generateCanvasWrapPDF, downloadPdfBytes } from "@/app/lib/pdf";
 import { normalizeUploadsToImages } from "@/app/lib/file/pdfToImage";
 import { DEFAULT_CANVAS_WRAP } from "@/app/lib/page/persistState";
@@ -72,17 +73,6 @@ export default function CanvasWrapWorkspace({ canvasWrap, onCanvasWrapChange }) 
     },
     [onCanvasWrapChange]
   );
-
-  const handleNumberChange = (field) => (e) => {
-    const val = e.target.value;
-    patchCanvasWrap({ [field]: val === "" ? "" : Number(val) });
-  };
-
-  const handleBlur = (field, value, min, max) => () => {
-    const num = Number(value);
-    if (value === "" || Number.isNaN(num) || num < min) patchCanvasWrap({ [field]: min });
-    else if (num > max) patchCanvasWrap({ [field]: max });
-  };
 
   const hasArtwork = files.length > 0;
 
@@ -303,25 +293,21 @@ export default function CanvasWrapWorkspace({ canvasWrap, onCanvasWrapChange }) 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold neu-text-muted">Width (mm)</label>
-                    <input
-                      type="number"
+                    <DraftNumberField
+                      value={width}
                       min={100}
                       max={2000}
-                      value={width}
-                      onChange={handleNumberChange("width")}
-                      onBlur={handleBlur("width", width, 100, 2000)}
+                      onCommit={(v) => patchCanvasWrap({ width: v })}
                       className={inputClass}
                     />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold neu-text-muted">Height (mm)</label>
-                    <input
-                      type="number"
+                    <DraftNumberField
+                      value={height}
                       min={100}
                       max={2000}
-                      value={height}
-                      onChange={handleNumberChange("height")}
-                      onBlur={handleBlur("height", height, 100, 2000)}
+                      onCommit={(v) => patchCanvasWrap({ height: v })}
                       className={inputClass}
                     />
                   </div>
@@ -361,13 +347,11 @@ export default function CanvasWrapWorkspace({ canvasWrap, onCanvasWrapChange }) 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold neu-text-muted">Thickness (mm)</label>
-                    <input
-                      type="number"
+                    <DraftNumberField
+                      value={thickness}
                       min={0}
                       max={100}
-                      value={thickness}
-                      onChange={handleNumberChange("thickness")}
-                      onBlur={handleBlur("thickness", thickness, 0, 100)}
+                      onCommit={(v) => patchCanvasWrap({ thickness: v })}
                       placeholder="35"
                       className={inputClass}
                     />
@@ -375,13 +359,11 @@ export default function CanvasWrapWorkspace({ canvasWrap, onCanvasWrapChange }) 
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold neu-text-muted">Extra per 90° fold (mm)</label>
-                    <input
-                      type="number"
+                    <DraftNumberField
+                      value={extra}
                       min={0}
                       max={50}
-                      value={extra}
-                      onChange={handleNumberChange("extra")}
-                      onBlur={handleBlur("extra", extra, 0, 50)}
+                      onCommit={(v) => patchCanvasWrap({ extra: v })}
                       placeholder="1"
                       className={inputClass}
                     />

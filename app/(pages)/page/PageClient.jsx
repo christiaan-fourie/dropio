@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CanvasWrapWorkspace from "@/app/components/CanvasWrapWorkspace";
+import DraftNumberField from "@/app/components/DraftNumberField";
 import { useDropzone } from "react-dropzone";
 import {
   FiBox,
@@ -1747,29 +1748,21 @@ function Editor({
           <div className="mt-3 grid grid-cols-2 gap-2">
             <label className="text-[11px] font-medium neu-text-muted">
               Width
-              <input
-                type="number"
+              <DraftNumberField
+                value={artboard.width}
                 min={MIN_MM}
                 max={MAX_MM}
-                value={artboard.width}
-                onChange={(e) => {
-                  const v = clamp(Number(e.target.value) || MIN_MM, MIN_MM, MAX_MM);
-                  setArtboard({ ...artboard, width: v });
-                }}
+                onCommit={(v) => setArtboard((prev) => ({ ...prev, width: v }))}
                 className={`${inputClass} mt-1 py-1.5 text-xs`}
               />
             </label>
             <label className="text-[11px] font-medium neu-text-muted">
               Height
-              <input
-                type="number"
+              <DraftNumberField
+                value={artboard.height}
                 min={MIN_MM}
                 max={MAX_MM}
-                value={artboard.height}
-                onChange={(e) => {
-                  const v = clamp(Number(e.target.value) || MIN_MM, MIN_MM, MAX_MM);
-                  setArtboard({ ...artboard, height: v });
-                }}
+                onCommit={(v) => setArtboard((prev) => ({ ...prev, height: v }))}
                 className={`${inputClass} mt-1 py-1.5 text-xs`}
               />
             </label>
@@ -1928,14 +1921,10 @@ function Editor({
               </button>
               <label className="block text-[11px] font-medium neu-text-muted">
                 Gap (mm)
-                <input
-                  type="number"
-                  min={0}
+                <DraftNumberField
                   value={layoutGap}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    if (Number.isFinite(v)) setLayoutGap(v);
-                  }}
+                  min={0}
+                  onCommit={setLayoutGap}
                   className={`${inputClass} mt-1 w-full py-2 text-xs`}
                 />
               </label>
@@ -2850,20 +2839,14 @@ function MultiSelectionPanel({
 
 function NumField({ label, value, onChange, min, uiScale = 1, placeholder = "" }) {
   const s = uiScale;
-  const display =
-    value == null || !Number.isFinite(value) ? "" : String(Math.round(value * 100) / 100);
   return (
     <label className="font-medium neu-text-muted" style={{ fontSize: s * 3.5 }}>
       {label}
-      <input
-        type="number"
+      <DraftNumberField
+        value={value}
         min={min}
-        value={display}
         placeholder={placeholder}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          if (Number.isFinite(v)) onChange(v);
-        }}
+        onCommit={onChange}
         className={inputClass}
         style={{
           marginTop: s * 1,
