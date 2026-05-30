@@ -799,9 +799,8 @@ export default function PageClient({ initialViewMode = "editor" }) {
     setActiveArtboardId(defaults[0].id);
     setSnapEnabled(true);
     setBusinessSheet("A4");
-    setGridRows(3);
-    setGridCols(2);
-    setGridGap(2);
+    setLayoutGap(2);
+    setLayoutLockAspect(true);
     setViewport(DEFAULT_VIEWPORT);
     setCanvasWrap({ ...DEFAULT_CANVAS_WRAP, files: [] });
     setViewMode("editor");
